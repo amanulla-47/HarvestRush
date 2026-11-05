@@ -384,6 +384,8 @@
 </head>
 <body>
 <canvas id="c"></canvas>
+<div id="vig" style="position:fixed;inset:0;pointer-events:none;background:radial-gradient(ellipse at 50% 50%, rgba(59,53,97,0) 52%, rgba(59,53,97,.22) 100%)"></div>
+<div id="perf" style="display:none;position:fixed;left:6px;bottom:max(6px,env(safe-area-inset-bottom));z-index:80;padding:6px 8px;border-radius:8px;background:rgba(20,18,40,.82);color:#e8ffe0;font:600 10.5px/1.35 ui-monospace,Menlo,monospace;white-space:pre-wrap;max-width:calc(100vw - 12px);box-sizing:border-box;pointer-events:none"></div>
 <div id="hud">
   <div id="tl" class="box"><div class="wcoin"></div><div><div id="coins"><span id="coinsN">0</span></div><div id="rate"></div></div></div>
   <div id="ql" class="box"><div class="lbl" id="qlbl">Quest</div><div id="qdots"></div><div id="qtext"></div><div id="qrow"><span id="qprog"></span><span id="qreward"></span></div></div>
@@ -401,7 +403,7 @@
   <div class="setrow"><span>🔔 Sound effects</span><input type="range" id="vSfx" min="0" max="100"></div>
   <div class="setrow"><span>🐦 Birds &amp; crickets</span><input type="range" id="vAmb" min="0" max="100"></div>
   <label class="setrow"><span>📳 Vibration</span><input type="checkbox" id="vVibe"></label>
-  <div class="setrow"><span>✨ Graphics</span><select id="vGfx"><option value="auto">Auto</option><option value="high">High</option><option value="low">Battery saver</option></select></div>
+  <div class="setrow"><span>✨ Graphics</span><select id="vGfx"><option value="auto">Auto</option><option value="high">High</option><option value="medium">Medium</option><option value="low">Battery saver</option></select></div>
   <div class="sdiv"></div>
   <div class="setrow col"><span class="lbl">Your name</span><input id="setName" maxlength="12" autocomplete="off" spellcheck="false"></div>
   <div class="pron" id="setPron"><span data-p="he">he / him</span><span data-p="she">she / her</span><span data-p="they">they / them</span></div>
@@ -570,12 +572,12 @@ function fmt(n){ n = Math.floor(n); if (n<1000) return ''+n; if (n<1e6) return (
 function fmtTime(s){ s=Math.floor(s); const h=Math.floor(s/3600), m=Math.floor(s%3600/60); return h?`${h}h ${m}m`:m?`${m}m`:`${s}s`; }
 
 // ---------- canvas ----------
-const canvas = $('#c'); let ctx = canvas.getContext('2d');   // swapped briefly to paint cached sprites
+const canvas = $('#c'); let ctx = canvas.getContext('2d', { alpha:false });   // opaque: the compositor never blends the game with the page behind it. Swapped briefly to paint cached sprites
 let W=0, H=0, dpr=1, zoom=1;
 // graphics quality: 0 full, 1 lighter, 2 lowest. "Auto" starts lighter on small devices and steps down if frames run slow.
 const EMBEDDED = (()=>{ try { return window.self !== window.top; } catch(e){ return true; } })();   // inside a portal page or app WebView (CrazyGames): it shares the main thread with the host
 const MOBILE = (window.matchMedia && matchMedia('(pointer:coarse)').matches) || 'ontouchstart' in window;
-const QUAL = { lv: ((navigator.hardwareConcurrency||8)<=2 || (navigator.deviceMemory||8)<=2) ? 1 : 0, avg:16.7, slowT:0, fastT:0, jank:0 };
+const QUAL = { lv: ((navigator.hardwareConcurrency||8)<=2 || (navigator.deviceMemory||8)<=2) ? 1 : 0, avg:16.7, slowT:0, fastT:0, work:6, probe:null, lockUntil:0, t:0 };
 const DPR_CAP = [2, 1.5, 1], PART_CAP = [600, 260, 120];
 function resize(){ dpr = Math.min(DPR_CAP[QUAL.lv], devicePixelRatio||1); W=innerWidth; H=innerHeight; canvas.width=Math.round(W*dpr); canvas.height=Math.round(H*dpr); canvas.style.width=W+'px'; canvas.style.height=H+'px'; zoom = clamp(Math.max(Math.min(W/1300, H/900), H/(CFG.worldH*TILT+90)), 0.6, 1.3); }   // tall phone screens zoom in so the farm fills the height
 addEventListener('resize', resize); resize();
@@ -767,7 +769,9 @@ async function initPlatform(){
 }
 function applyMasterVolume(){ if (master) master.gain.value = (S.sound && !CG.muted) ? 0.85 : 0; }
 // gameplayStart while the farm is playable; gameplayStop behind settings, chapter cards and the welcome-back card
-function cgGameplay(on){ if (!cgOn() || CG.playing===on) return; CG.playing = on; try { if (on && !CG.loaded){ CG.loaded = true; CG.sdk.game.loadingStop(); } on ? CG.sdk.game.gameplayStart() : CG.sdk.game.gameplayStop(); } catch(e){} }
+function cgGameplay(on){ if (!cgOn()) return;
+  try { if (!CG.loaded){ CG.loaded = true; CG.sdk.game.loadingStop(); CG.sdk.game.gameplayStart(); CG.playing = true; }   // the farm is playable on the first frame; a welcome-back card on top counts as a pause, not loading
+    if (CG.playing===on) return; CG.playing = on; on ? CG.sdk.game.gameplayStart() : CG.sdk.game.gameplayStop(); } catch(e){} }
 function cgHappy(){ if (cgOn()) try { CG.sdk.game.happytime(); } catch(e){} }
 // saves go to the CrazyGames Data module when it is there (synced across devices), with localStorage as the fallback
 const cgData = () => cgOn() && CG.sdk.data && typeof CG.sdk.data.getItem==='function';
@@ -1213,9 +1217,11 @@ function nightAmt(){ const p = ((time + DAY_LEN*0.12) % DAY_LEN)/DAY_LEN; if (p<
 const FLIES = []; for (let i=0;i<26;i++){ const f = S.fields[i%S.fields.length]; FLIES.push({ x:f.cx+rnd(-200,200), y:f.cy+rnd(-150,150), ph:rnd(6.28), sp:rnd(0.6,1.2) }); }
 function drawFireflies(){ const n = nightAmt(); if (n<0.4) return; const a = (n-0.4)/0.6; for (const f of FLIES){ const x = f.x+Math.sin(time*f.sp+f.ph)*30, y = f.y+Math.cos(time*f.sp*0.7+f.ph)*16, bl = Math.max(0, Math.sin(time*2.2+f.ph*3)); if (bl<0.1) continue; glow(x, y-14, 12, 0.9*a*bl, '255,250,150'); ctx.fillStyle = `rgba(255,255,200,${a*bl})`; ctx.beginPath(); ctx.arc(x, y-14, 1.6, 0, 6.2832); ctx.fill(); } }
 function drawAtmosphere(){ const n = nightAmt(); ctx.setTransform(dpr,0,0,dpr,0,0);
+  if (VIG.lv!==(QUAL.lv?1:0)){ VIG.lv = QUAL.lv?1:0; $('#vig').style.display = QUAL.lv ? 'none' : ''; }
   if (QUAL.lv){ if (n>0){ ctx.globalAlpha = n*0.32; ctx.fillStyle = n<0.5 ? '#c98a3a' : '#3b3f7a'; ctx.fillRect(0,0,W,H); ctx.globalAlpha = 1; } return; }   // lighter: one plain tint, no blend mode or vignette
   if (n>0){ ctx.globalCompositeOperation = 'multiply'; if (n<0.5){ ctx.globalAlpha = n*0.7; ctx.fillStyle = '#ffd08a'; ctx.fillRect(0,0,W,H); } else { ctx.globalAlpha = 0.35; ctx.fillStyle = '#ffd08a'; ctx.fillRect(0,0,W,H); ctx.globalAlpha = (n-0.5)*0.8; ctx.fillStyle = '#9a93dd'; ctx.fillRect(0,0,W,H); } ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over'; }
-  const vg = ctx.createRadialGradient(W/2, H/2, Math.min(W,H)*0.45, W/2, H/2, Math.max(W,H)*0.75); vg.addColorStop(0,'rgba(59,53,97,0)'); vg.addColorStop(1,'rgba(59,53,97,.22)'); ctx.fillStyle = vg; ctx.fillRect(0,0,W,H); }
+  }   // the vignette is the #vig CSS layer
+const VIG = { lv:-1 };
 const FLOCK = { t: 8, active:false, x:0, y:0, vx:0, vy:0, birds:[] };
 function updateFlock(dt){ const F = FLOCK; if (!F.active){ F.t -= dt; if (F.t<=0 && nightAmt()<0.4){ F.active = true; const left = Math.random()<0.5; F.x = left ? -100 : CFG.worldW+100; F.y = rnd(150, CFG.worldH-400); F.vx = left ? 150 : -150; F.vy = rnd(-25,25); F.birds = []; const n = 3+Math.floor(Math.random()*3); for (let i=0;i<n;i++) F.birds.push({ ox: -Math.sign(F.vx)*(i%2?1:0.6)*Math.ceil(i/2)*26, oy: (i%2?-1:1)*Math.ceil(i/2)*18, ph:rnd(6.28) }); } return; }
   F.x += F.vx*dt; F.y += F.vy*dt; if (F.x < -200 || F.x > CFG.worldW+200){ F.active = false; F.t = rnd(25,45); } }
@@ -2058,7 +2064,7 @@ function drawParts(){ const hw = W/2/zoom+40, hh = H/2/(zoom*TILT)+40; for (cons
   else if (p.sq){ ctx.save(); ctx.translate(p.x,p.y); ctx.rotate(p.t*6); ctx.fillRect(-p.r,-p.r/2,p.r*2,p.r); ctx.restore(); } else { ctx.beginPath(); ctx.arc(p.x,p.y,p.r,0,6.2832); ctx.fill(); } } ctx.globalAlpha = 1; }
 function drawJoystick(){ if (!joy.on) return; ctx.setTransform(dpr,0,0,dpr,0,0); ctx.strokeStyle='rgba(255,255,255,.75)'; ctx.lineWidth=4; ctx.fillStyle='rgba(255,255,255,.18)'; ctx.beginPath(); ctx.arc(joy.ox,joy.oy,52,0,6.2832); ctx.fill(); ctx.stroke(); const dx=joy.x-joy.ox, dy=joy.y-joy.oy, d=Math.hypot(dx,dy), m=Math.min(d,50); ctx.fillStyle='rgba(255,255,255,.85)'; ctx.beginPath(); ctx.arc(joy.ox+(d?dx/d*m:0), joy.oy+(d?dy/d*m:0), 22, 0, 6.2832); ctx.fill(); ctx.strokeStyle=COL.ink; ctx.lineWidth=2.5; ctx.stroke(); }
 
-const PACE = { next:0 };
+const PACE = { next:0, dt:0 };
 // the static ground (grass, road, plaza, lanes, tufts, yards, hedges) is painted once into 320 px tiles at the exact
 // screen scale and stamped 1:1, so phones skip redrawing the whole farm's paths every frame with no visible change
 const GROUND = { tiles:new Map(), scale:0, key:'', T:320 };
@@ -2081,7 +2087,7 @@ function buildGroundTile(i, j, sc){ const T = GROUND.T, c = document.createEleme
   g.setTransform(sc, 0, 0, sc*TILT, -i*T, -j*T); const saved = ctx; ctx = g; try { drawGround(); } finally { ctx = saved; } return c; }
 let frameDt = 0, DECOR_SMALL = null, DECOR_TALL = null; const LAYER = [], byY = (a,b)=>a.y-b.y;
 function render(){
-  ctx.setTransform(dpr,0,0,dpr,0,0); const sky = ctx.createLinearGradient(0,0,0,H); const nn = nightAmt(); sky.addColorStop(0, nn<0.5 ? mix('#bfe9ff','#ffb88a',nn*2) : mix('#ffb88a','#3b3f7a',(nn-0.5)*2)); sky.addColorStop(1, nn<0.5 ? mix('#8fd3ff','#ffd0a0',nn*2) : mix('#ffd0a0','#5a4f9a',(nn-0.5)*2)); ctx.fillStyle = sky; ctx.fillRect(0,0,W,H);
+  ctx.setTransform(dpr,0,0,dpr,0,0); const hwv = W/2/zoom, hhv = H/2/zoom; if (cam.x-hwv>-6 && cam.x+hwv<CFG.worldW+6 && cam.y-hhv>-6 && cam.y+hhv<CFG.worldH+80){} else { const sky = ctx.createLinearGradient(0,0,0,H); const nn = nightAmt(); sky.addColorStop(0, nn<0.5 ? mix('#bfe9ff','#ffb88a',nn*2) : mix('#ffb88a','#3b3f7a',(nn-0.5)*2)); sky.addColorStop(1, nn<0.5 ? mix('#8fd3ff','#ffd0a0',nn*2) : mix('#ffd0a0','#5a4f9a',(nn-0.5)*2)); ctx.fillStyle = sky; ctx.fillRect(0,0,W,H); }   // the sky only shows past the island's edge
   const sx = shake>0 ? rnd(-shake,shake) : 0, sy = shake>0 ? rnd(-shake,shake) : 0, zz = zoom*(1+zoomKick);
   const tx = Math.round(dpr*(W/2-(cam.x+sx)*zz)), ty = Math.round(dpr*(H/2-(cam.y+sy)*zz*TILT));   // whole device pixels: cached tiles stay pin-sharp
   ctx.setTransform(dpr*zz, 0, 0, dpr*zz*TILT, tx, ty);
@@ -2139,9 +2145,11 @@ function hud(L){
 // ---------- loop ----------
 let last = performance.now(), running = false, hiddenAt = 0;
 function frame(now){
-  requestAnimationFrame(frame);
+  requestAnimationFrame(frame); PERF.raf++;
   if (MOBILE && !window.__step){ if (now - PACE.next > 60) PACE.next = now; if (now < PACE.next - 3.5) return; PACE.next += 1000/60; }   // phones: pace to 60 fps whatever the screen's refresh rate (90/120 Hz would double the work)
-  cgGameplay(running && !storyOpen); const raw = now-last; let dt = Math.min(0.05, raw/1000); last = now; if (running && !storyOpen && raw>0 && raw<250) adaptQuality(raw, dt); if (!running || storyOpen) { render(); return; }
+  const tF0 = performance.now(); cgGameplay(running && !storyOpen); const raw = now-last; let dt = Math.min(0.05, raw/1000); last = now;
+  if (raw>0 && raw<100) dt = PACE.dt = PACE.dt ? PACE.dt*0.5 + dt*0.5 : dt; else PACE.dt = 0;   // hosts that deliver frames unevenly (CrazyGames app ~42 Hz) would judder; the average speed is unchanged
+  if (running && !storyOpen && raw>0 && raw<250) adaptQuality(raw, dt); if (!running || storyOpen) { render(); return; }
   time += dt; frameDt = dt; updateCrops(dt); updatePlayer(dt); for (const h of hands) updateHand(h, dt); updateCam(dt);
   for (const c of [P, ...hands]){ c.bsq = Math.max(0, (c.bsq||0)-dt*5); c.happy = Math.max(0, (c.happy||0)-dt); for (const it of c.carry) if (it.t<1){ it.t = Math.min(1, it.t+dt*3.2); if (it.t>=1) c.bsq = 1; }
     if (c.moving && (c===P || !QUAL.lv)){ c.dustT = (c.dustT||0)+dt; if (c.dustT>(QUAL.lv>1 ? 0.26 : 0.13)){ c.dustT = 0; parts.push({ x:c.x-c.face*10+rnd(-4,4), y:c.y+20, vx:-c.face*25, vy:-18, life:0.45, t:0, color:'rgba(255,255,255,.75)', r:4, g:-30 }); } } }
@@ -2155,19 +2163,40 @@ function frame(now){
   saveT += dt; if (saveT>CFG.saveEvery){ saveT = 0; save(); }
   storyT += dt; if (storyT>0.5){ storyT = 0; checkStory(); checkQuests(); }
   if (stripT>0){ if (!$('#buy').classList.contains('show')) stripT -= dt; if (stripT<=0) hideStrip(); }   // the story strip waits while an upgrade card is open
-  render();
+  const tR0 = performance.now(); render(); const tR1 = performance.now(); QUAL.work = tR1-tF0; if (PERF.on) perfTick(raw, tR0-tF0, tR1-tR0);
 }
+// hidden performance readout: tap the level ring 5 times (works inside the CrazyGames app too)
+const PERF = { on:false, raf:0, n:0, sum:0, worst:0, long:0, upd:0, rnd:0, t0:0 };
+function perfTick(raw, upd, rnd){ const P2 = PERF; P2.n++; P2.sum += raw; P2.worst = Math.max(P2.worst, raw); if (raw>34) P2.long++; P2.upd += upd; P2.rnd += rnd;
+  const now = performance.now(); if (now-P2.t0 < 1000) return; const secs = (now-P2.t0)/1000, n = Math.max(1, P2.n), vv = window.visualViewport;
+  $('#perf').textContent = [
+    'fps '+(P2.n/secs).toFixed(0)+'   screen '+(P2.raf/secs).toFixed(0)+' Hz',
+    'frame avg '+(P2.sum/n).toFixed(1)+' ms  worst '+P2.worst.toFixed(0)+'  >34ms: '+P2.long,
+    'game logic '+(P2.upd/n).toFixed(1)+' ms   draw '+(P2.rnd/n).toFixed(1)+' ms   (rest of each frame = host page)',
+    'view '+innerWidth+'×'+innerHeight+'  dpr '+(devicePixelRatio||1).toFixed(2)+'→'+(+dpr.toFixed(2))+(vv ? '  vv '+vv.scale.toFixed(2) : ''),
+    'canvas '+canvas.width+'×'+canvas.height+' ('+(canvas.width*canvas.height/1e6).toFixed(2)+' MP)  zoom '+zoom.toFixed(2),
+    'quality '+['High','Medium','Saver'][QUAL.lv]+' ('+(S.settings.gfx||'auto')+(QUAL.probe ? ', testing' : QUAL.t<(QUAL.lockUntil||0) ? ', kept: lower gave no gain' : '')+')  tiles '+GROUND.tiles.size+'  sprites '+CHAR_CACHE.size,
+    'embedded '+EMBEDDED+'  mobile '+MOBILE+'  sdk '+CG.env+'  cores '+(navigator.hardwareConcurrency||'?')+'  mem '+(navigator.deviceMemory||'?'),
+    'parts '+parts.length+'  workers '+hands.length+'  '+(navigator.userAgent.match(/(iPhone|iPad|Android [\d.]+|CrazyGames[^ ;)]*)/g)||[]).join(' ')
+  ].join('\n');
+  Object.assign(P2, { raf:0, n:0, sum:0, worst:0, long:0, upd:0, rnd:0, t0:now }); }
+{ let taps = [], ring = $('#xpring'); ring.style.pointerEvents = 'auto';
+  ring.addEventListener('pointerdown', e=>{ e.stopPropagation(); const t = performance.now(); taps = taps.filter(x=>t-x<2000); taps.push(t);
+    if (taps.length>=5){ taps = []; PERF.on = !PERF.on; $('#perf').style.display = PERF.on ? 'block' : 'none'; Object.assign(PERF, { raf:0, n:0, sum:0, worst:0, long:0, upd:0, rnd:0, t0:performance.now() }); $('#perf').textContent = 'measuring…'; } }); }
 document.addEventListener('visibilitychange', ()=>{ if (document.hidden){ hiddenAt = Date.now(); save(); } else if (hiddenAt){ const sec = (Date.now()-hiddenAt)/1000; hiddenAt = 0; last = performance.now(); if (sec>2){ const big = sec>=120; const e = applyOffline(sec, big); checkDaily(); if (big && running) showAway(sec); else if (e>=1) addPop(P.x, P.y-80, 'While you were away  +'+fmt(e), {color:COL.gold, size:20, life:2, vy:-30}); } } });
 addEventListener('pagehide', save); addEventListener('beforeunload', save);
 
 // ---------- adaptive quality ----------
 function setQuality(lv){ lv = clamp(lv, 0, 2); if (lv===QUAL.lv) return; QUAL.lv = lv; QUAL.slowT = QUAL.fastT = 0; resize(); FIELD_CACHE.clear(); PLANT_CACHE.clear(); CHAR_CACHE.clear(); GROUND.tiles.clear(); if (parts.length>PART_CAP[lv]) parts.splice(0, parts.length-PART_CAP[lv]); }
-function applyGfx(){ const g = S.settings.gfx||'auto'; if (g==='high') setQuality(0); else if (g==='low') setQuality(2); }
-function adaptQuality(ms, dt){ if ((S.settings.gfx||'auto')!=='auto') return; QUAL.avg += (ms-QUAL.avg)*0.05;
-  QUAL.jank = QUAL.jank*Math.pow(0.5, dt/2) + (ms>40 ? 1 : 0);   // dropped frames, decaying with a 2 s half-life
-  if (QUAL.jank>12 && QUAL.lv<2){ setQuality(QUAL.lv+1); QUAL.jank = 0; QUAL.avg = 16.7; return; }   // frequent hitches feel laggy even when the average looks fine
-  if (QUAL.avg>28){ QUAL.slowT += dt; QUAL.fastT = 0; if (QUAL.slowT>4 && QUAL.lv<2){ setQuality(QUAL.lv+1); QUAL.avg = 16.7; } }   // under ~40 fps for a few seconds: go lighter
-  else { QUAL.slowT = Math.max(0, QUAL.slowT-dt); if (QUAL.avg<(MOBILE ? 17.2 : 12) && QUAL.jank<0.5){ QUAL.fastT += dt; if (QUAL.fastT>40 && QUAL.lv>0){ setQuality(QUAL.lv-1); QUAL.avg = 16.7; } } else QUAL.fastT = 0; } }   // lots of headroom for a long while: try one step richer
+function applyGfx(){ const g = S.settings.gfx||'auto'; if (g==='high') setQuality(0); else if (g==='medium') setQuality(1); else if (g==='low') setQuality(2); }
+function adaptQuality(ms, dt){ if ((S.settings.gfx||'auto')!=='auto') return; const Q = QUAL; Q.avg += (ms-Q.avg)*0.05; Q.t = (Q.t||0)+dt;
+  if (Q.probe){ Q.probe.t += dt; if (Q.probe.t>3.5){   // judge a step down by what it actually did
+      const fpsNow = 1000/Q.avg, p = Q.probe; Q.probe = null;
+      if (fpsNow < p.fps*1.15){ setQuality(p.from); Q.lockUntil = Q.t+120; Q.avg = 1000/p.fps; } }   // no real gain (the host is the limit): keep full quality
+    return; }
+  if (Q.avg>24){ Q.slowT += dt; Q.fastT = 0;   // under ~42 fps for a while: try one step lighter, on probation
+    if (Q.slowT>3 && Q.lv<2 && Q.t>(Q.lockUntil||0)){ Q.probe = { from:Q.lv, fps:1000/Q.avg, t:0 }; setQuality(Q.lv+1); Q.slowT = 0; } }
+  else { Q.slowT = Math.max(0, Q.slowT-dt); if (Q.avg<18){ Q.fastT += dt; if (Q.fastT>30 && Q.lv>0){ setQuality(Q.lv-1); Q.fastT = 0; } } else Q.fastT = 0; } }   // lots of headroom: try one step richer
 
 // ---------- story cards ----------
 let storyOpen = false, storyT = 0;
@@ -2222,7 +2251,7 @@ $('#gear').onclick = ()=>{ initAudio(); SFX.ui(); openSettings(); };
 $('#setDone').onclick = ()=>{ SFX.ui(); closeSettings(); };
 $('#setReset').onclick = ()=>{ if (confirm('Reset your whole farm? This cannot be undone.')) resetAll(); };
 for (const [id,k] of [['vMusic','music'],['vSfx','sfx'],['vAmb','amb']]) $('#'+id).addEventListener('input', e=>{ S.settings[k] = +e.target.value; initAudio(); applyVolumes(); if (k==='sfx') SFX.coin(); });
-$('#vGfx').addEventListener('change', e=>{ S.settings.gfx = e.target.value; if (S.settings.gfx==='auto'){ QUAL.avg = 16.7; QUAL.slowT = QUAL.fastT = 0; } applyGfx(); });
+$('#vGfx').addEventListener('change', e=>{ S.settings.gfx = e.target.value; if (S.settings.gfx==='auto'){ QUAL.avg = 16.7; QUAL.probe = null; QUAL.lockUntil = 0; QUAL.slowT = QUAL.fastT = 0; } applyGfx(); });
 $('#vVibe').addEventListener('change', e=>{ S.settings.vibe = e.target.checked; if (S.settings.vibe) buzz(30); });
 $('#setPron').addEventListener('click', e=>{ const b = e.target.closest('span[data-p]'); if (!b) return; S.pron = b.dataset.p; for (const x of $('#setPron').children) x.classList.toggle('on', x===b); });
 $('#setName').addEventListener('input', e=>{ const nm = e.target.value.trim(); if (nm){ S.name = nm.slice(0,12); applyName(); } });

@@ -429,6 +429,23 @@ home, festival) the game adapts to the device:
     pixels differ, by anti-aliasing rounding along the road edge. Tiles build two per frame, one ring
     ahead of the view, up to 56 kept (~22 MB). Desktop still draws the ground live.
   - **Worker sprites** at full resolution with 12 walk frames.
+- **Measured in the CrazyGames app (Android 16, 8 cores):** the game's own work was ~0.5 ms logic + ~6 ms
+  draw per frame, but the app only delivered ~42 frames a second, unevenly (24–33 ms apart): the
+  CrazyGames page shares the WebView's main thread. So:
+  - **Correction:** at High the same phone fell under 20 fps (Saver: ~42). The app's WebView draws the
+    canvas on the CPU *after* our timer stops, so resolution matters there. So:
+  - **Auto keeps a lower level only if it helps** (`QUAL.probe`): under ~42 fps for 3 s it tries one
+    step lighter for 3.5 s; if fps didn't improve by 15% (the host is the limit) it goes back to full
+    quality and doesn't try again for 2 minutes. Otherwise it keeps the lighter level, and tries one
+    step richer after 30 s above ~55 fps. Settings ▸ Graphics: Auto / High / Medium / Battery saver.
+  - **Full-screen effects off the canvas:** the vignette is a CSS layer (`#vig`) drawn by the compositor,
+    and the sky is only painted where the view goes past the island, so the canvas no longer fills
+    every pixel two extra times per frame.
+  - **Uneven frame delivery is smoothed** (`PACE.dt`, a light moving average of the frame step; the
+    average speed is unchanged), so 24–33 ms gaps don't judder.
+  - **Opaque canvas** (`alpha:false`): the compositor never blends the game with the host page.
+  - **Hidden readout:** tap the level ring 5 times for fps, screen Hz, frame times, logic/draw ms,
+    view and canvas size, quality, embedding and device info. Works inside the CrazyGames app.
 - **Auto quality only as a last resort:** it steps down only for sustained trouble (average over 28 ms
   for 4 s, or very frequent hitches); Settings ▸ Graphics ▸ High turns it off entirely.
 - **60 fps pacing on phones** (`PACE`): 90/120 Hz screens no longer double the work; frames are paced
