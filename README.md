@@ -422,6 +422,35 @@ home, festival) the game adapts to the device:
   look, facing, walk frame (8) and basket fill, with 94% reuse; the farmer you control is drawn live.
 - On a 402×874 phone screen, the lowest level draws 4× fewer pixels than High.
 
+## CrazyGames
+
+Ready for a CrazyGames **Basic Launch** (SDK v3, no ads).
+
+- **SDK v3** (`https://sdk.crazygames.com/crazygames-sdk-v3.js`, loaded async). `initPlatform()` waits up
+  to 2 s for the script and 4 s for `init()`, so the game also runs anywhere else (GitHub Pages,
+  offline, ad blockers); outside CrazyGames and localhost the SDK reports `disabled` and is left alone.
+- **Events:** `loadingStart` at boot, `loadingStop` + `gameplayStart` on the first playable frame,
+  `gameplayStop` while Settings, a chapter card or the welcome-back card is open, `gameplayStart` again
+  after. `happytime` when a Harvest Festival is held. No ads are requested.
+- **Mute:** the platform's `muteAudio` setting (and its change listener) silences the game even when
+  the in-game sound button is on.
+- **Saving:** through the **Data module** (synced across the player's devices), with localStorage as a
+  fallback and for older saves. In the Developer Portal, set **Progress save** to the Data module option.
+- **Requirements covered:** lands straight in gameplay; one 290 KB file (88 KB zipped, far under the
+  50 MB / 20 MB mobile limits and 1,500 files); no external links, logins, fullscreen button or ads;
+  English; PEGI 12 friendly; touch + mouse + keyboard; physics are time-based (same at 60/144/165 Hz).
+- **Keys:** WASD by physical key position, so AZERTY players get ZQSD; arrows and Space don't scroll
+  the page; Esc is not used (it exits fullscreen).
+- **Small frames:** the compact HUD also applies to frames 560 px tall or less (CrazyGames 821×462,
+  mobile 800×450). In landscape frames up to 800 px tall the upgrade card docks bottom-right and the
+  chapter strip bottom-left, so the farmer in the middle stays visible.
+- **iOS audio:** any tap resumes an interrupted AudioContext.
+- **Build:** `tools/build-crazygames.sh` → `dist/harvest-rush-crazygames.zip` (index.html at the root).
+- **Covers:** with the local server running, `tools/covers.sh` renders `dist/covers/` at 1920×1080,
+  800×1200 and 800×800 from `?debug&cover` (a staged daytime farm with only the title).
+- **Local test:** `http://127.0.0.1:8767/` runs the SDK in local mode (console logs every event);
+  add `&muteAudio=true` to test muting.
+
 ## Debug
 
 Open with `?debug` to get a `window.FARM` hook:
