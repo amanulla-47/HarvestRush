@@ -82,6 +82,19 @@ name, its level before and after, a highlighted line saying what you get, and on
 with the price on it (it says how much more you need when you can't afford it). The corner
 buttons are round leaf buttons with drawn icons.
 
+- **Upgrade card controls:** only a deliberate tap on the green button buys, and it buys on
+  release, not on touch. A finger that slides off the button turns into a walk, and drags that
+  start anywhere else on the card move the farmer, so the card never traps you. A tap that was
+  already landing when the card popped up is ignored (300 ms). The ✕ (or Esc) hides the card until
+  you step off that sign; Space/Enter buy on a keyboard.
+- **Phone layout** (screens up to 520 px wide): a compact HUD so the farm stays visible. The
+  wallet, quest and order cards, level ring, hint, corner buttons (42 px), chapter strip and upgrade
+  card are all scaled down; on a 402×874 iPhone the upgrade card is about 200 px tall instead of
+  300+, and the left-hand cards take about 195 px instead of 245. Desktop sizes are unchanged.
+- **Story strip controls:** the chapter strip never blocks play. Drags that start on it walk the
+  farmer; "Read the chapter" and the ✕ (now a 36 px round button) act only on a tap, on release, and
+  ignore a tap that was already landing when the strip slid in.
+
 ## Map
 
 The market sits on a clean paved square across the top of the farm: the stall centred at the back
@@ -389,6 +402,25 @@ fields on screen).
   or pixel density changes.
 
 When changing crop art, edit the draw functions as usual; the sprites are made from them.
+
+**Full farm on weak phones.** With everything unlocked (8 fields at Lv 5, 12 workers, partner,
+home, festival) the game adapts to the device:
+- **Graphics quality** (`QUAL`, Settings ▸ Graphics: Auto / High / Battery saver). Auto starts one
+  step lighter on devices with 4 or fewer CPU cores or 3 GB or less memory, steps down after about
+  2.5 s under ~40 fps, and tries one step richer after 40 s of headroom.
+
+  | Level | Canvas resolution | Particles | Extras |
+  |---|---|---|---|
+  | 0 High | up to 2× | 600 | everything |
+  | 1 Lighter | up to 1.5× | 260 | no petals, bugs, vignette or blend-mode night; worker sprites; no worker dust |
+  | 2 Battery saver | 1× | 120 | also no grass tufts, slower dust |
+
+- **Sprinklers** spray by time (not per frame, which doubled the drops on 120 Hz phones) and only
+  for fields on screen. A maxed farm went from ~500 live water drops to ~110.
+- **Off-screen particles** are skipped when drawing.
+- **Worker sprites** (`CHAR_CACHE`, lighter levels): each worker is stamped from a cached image per
+  look, facing, walk frame (8) and basket fill, with 94% reuse; the farmer you control is drawn live.
+- On a 402×874 phone screen, the lowest level draws 4× fewer pixels than High.
 
 ## Debug
 
