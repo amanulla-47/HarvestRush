@@ -11,6 +11,7 @@
 <style>
   html,body{margin:0;height:100%;overflow:hidden;background:#6cbf4a;font-family:Nunito,"Trebuchet MS",system-ui,sans-serif;color:#3b3561;user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent}
   canvas{display:block;touch-action:none}
+  html,body{overscroll-behavior:none}
   #hud{position:fixed;inset:0;pointer-events:none;overflow:hidden}
   .box{position:absolute;padding:8px 14px;background:#fff9ec;border:3px solid #3b3561;border-radius:20px;box-shadow:0 5px 0 #3b3561;font-weight:700}
   .coin{display:inline-block;width:.78em;height:.78em;border-radius:50%;background:radial-gradient(circle at 35% 35%,#ffe680,#f5b400 70%);border:2px solid #3b3561;vertical-align:-.06em;margin-right:5px;box-sizing:border-box}
@@ -572,7 +573,9 @@ function fmtTime(s){ s=Math.floor(s); const h=Math.floor(s/3600), m=Math.floor(s
 const canvas = $('#c'); let ctx = canvas.getContext('2d');   // swapped briefly to paint cached sprites
 let W=0, H=0, dpr=1, zoom=1;
 // graphics quality: 0 full, 1 lighter, 2 lowest. "Auto" starts lighter on small devices and steps down if frames run slow.
-const QUAL = { lv: ((navigator.hardwareConcurrency||8)<=4 || (navigator.deviceMemory||8)<=3) ? 1 : 0, avg:16.7, slowT:0, fastT:0 };
+const EMBEDDED = (()=>{ try { return window.self !== window.top; } catch(e){ return true; } })();   // inside a portal page or app WebView (CrazyGames): it shares the main thread with the host
+const MOBILE = (window.matchMedia && matchMedia('(pointer:coarse)').matches) || 'ontouchstart' in window;
+const QUAL = { lv: ((navigator.hardwareConcurrency||8)<=2 || (navigator.deviceMemory||8)<=2) ? 1 : 0, avg:16.7, slowT:0, fastT:0, jank:0 };
 const DPR_CAP = [2, 1.5, 1], PART_CAP = [600, 260, 120];
 function resize(){ dpr = Math.min(DPR_CAP[QUAL.lv], devicePixelRatio||1); W=innerWidth; H=innerHeight; canvas.width=Math.round(W*dpr); canvas.height=Math.round(H*dpr); canvas.style.width=W+'px'; canvas.style.height=H+'px'; zoom = clamp(Math.max(Math.min(W/1300, H/900), H/(CFG.worldH*TILT+90)), 0.6, 1.3); }   // tall phone screens zoom in so the farm fills the height
 addEventListener('resize', resize); resize();
@@ -808,6 +811,8 @@ addEventListener('keydown', e=>{ if (e.target && e.target.tagName==='INPUT') ret
   if ((e.key===' ' || e.key==='Enter') && !e.repeat && $('#buy').classList.contains('show')) tryBuy(); });
 addEventListener('keyup', e=>{ keys[e.key.toLowerCase()] = false; if (KEY_CODE[e.code]) keys[KEY_CODE[e.code]] = false; });
 addEventListener('blur', ()=>{ for (const k in keys) keys[k] = false; });
+document.addEventListener('touchmove', e=>{ if (!e.target.closest('#settings .card, #story .scard, input, select')) e.preventDefault(); }, { passive:false });   // stops app WebViews scrolling or bouncing the page mid-drag
+document.addEventListener('gesturestart', e=>e.preventDefault());
 canvas.addEventListener('pointerdown', e=>{ if (joy.on) return; joy.on=true; joy.id=e.pointerId; joy.ox=joy.x=e.clientX; joy.oy=joy.y=e.clientY; try { canvas.setPointerCapture(e.pointerId); } catch(err){} initAudio(); });
 canvas.addEventListener('pointermove', e=>{ if (!joy.on || e.pointerId!==joy.id) return; joy.x=e.clientX; joy.y=e.clientY; const d = dist(joy.x,joy.y,joy.ox,joy.oy); if (d>70){ joy.ox = joy.x-(joy.x-joy.ox)*70/d; joy.oy = joy.y-(joy.y-joy.oy)*70/d; } });
 const joyEnd = e=>{ if (e.pointerId===joy.id){ joy.on=false; joy.id=null; } };
@@ -1853,16 +1858,16 @@ function drawFarmer(c, L, big, cap){
 // fill. The farmer you control is always drawn live.
 const CHAR_CACHE = new Map(), CH_W = 130, CH_H = 150, CH_OX = 65, CH_OY = 108, LOOK_ID = new Map();
 function drawFarmerFast(c, L, big, cap){
-  if (!QUAL.lv || c===P || SPRITE || (c.bsq||0)>0.05) return drawFarmer(c, L, big, cap);   // full quality draws live; the basket squash after a pick is brief
-  const S2 = sprScale(), TAU = 6.2832, fr = c.moving ? Math.floor((((c.bob%TAU)+TAU)%TAU)/TAU*8)%8 : -1;
+  if ((!QUAL.lv && !MOBILE) || c===P || SPRITE || (c.bsq||0)>0.05) return drawFarmer(c, L, big, cap);   // full quality draws live; the basket squash after a pick is brief
+  const S2 = sprScale(), TAU = 6.2832, fr = c.moving ? Math.floor((((c.bob%TAU)+TAU)%TAU)/TAU*12)%12 : -1;
   let sig = 0; for (const it of c.carry) if (it.t>=1) sig++; const top = c.carry.find(it=>it.t>=1); if (top) sig += 'x'+top.ci;   // how full, and with what: close enough at worker size
   if (!LOOK_ID.has(L)) LOOK_ID.set(L, LOOK_ID.size);
   const key = LOOK_ID.get(L)+'|'+c.face+'|'+fr+'|'+(c.carry.length>=cap?1:0)+((c.happy||0)>0?1:0)+'|'+sig+'|'+S2;
   let cv = CHAR_CACHE.get(key);
   if (!cv){ cv = document.createElement('canvas'); cv.width = Math.ceil(CH_W*S2); cv.height = Math.ceil(CH_H*S2); const g = cv.getContext('2d'); g.scale(S2, S2);
-    const sv = { x:c.x, y:c.y, bob:c.bob, moving:c.moving }, saved = ctx; c.x = CH_OX; c.y = CH_OY; c.bob = (fr+0.5)/8*TAU; c.moving = fr>=0;
+    const sv = { x:c.x, y:c.y, bob:c.bob, moving:c.moving }, saved = ctx; c.x = CH_OX; c.y = CH_OY; c.bob = (fr+0.5)/12*TAU; c.moving = fr>=0;
     ctx = g; SPRITE = true; try { drawFarmer(c, L, big, cap); } finally { ctx = saved; SPRITE = false; Object.assign(c, sv); }
-    CHAR_CACHE.set(key, cv); if (CHAR_CACHE.size > 100) CHAR_CACHE.delete(CHAR_CACHE.keys().next().value); }
+    CHAR_CACHE.set(key, cv); if (CHAR_CACHE.size > 160) CHAR_CACHE.delete(CHAR_CACHE.keys().next().value); }
   const idle = c.moving ? 0 : Math.sin(time*3+c.x*0.01)*1.2;
   ctx.drawImage(cv, c.x-CH_OX, c.y-CH_OY-idle, CH_W, CH_H); }
 function drawZ(c){ const k = hands.indexOf(c); for (let j=0;j<2;j++){ const zt = (time*0.6+k*0.37+j*0.5)%1; ctx.globalAlpha = Math.sin(zt*Math.PI); text('z', c.x+16+zt*12, c.y-40-zt*34, 13+zt*7, '#6a6488', {weight:900}); } ctx.globalAlpha = 1; }
@@ -2053,23 +2058,49 @@ function drawParts(){ const hw = W/2/zoom+40, hh = H/2/(zoom*TILT)+40; for (cons
   else if (p.sq){ ctx.save(); ctx.translate(p.x,p.y); ctx.rotate(p.t*6); ctx.fillRect(-p.r,-p.r/2,p.r*2,p.r); ctx.restore(); } else { ctx.beginPath(); ctx.arc(p.x,p.y,p.r,0,6.2832); ctx.fill(); } } ctx.globalAlpha = 1; }
 function drawJoystick(){ if (!joy.on) return; ctx.setTransform(dpr,0,0,dpr,0,0); ctx.strokeStyle='rgba(255,255,255,.75)'; ctx.lineWidth=4; ctx.fillStyle='rgba(255,255,255,.18)'; ctx.beginPath(); ctx.arc(joy.ox,joy.oy,52,0,6.2832); ctx.fill(); ctx.stroke(); const dx=joy.x-joy.ox, dy=joy.y-joy.oy, d=Math.hypot(dx,dy), m=Math.min(d,50); ctx.fillStyle='rgba(255,255,255,.85)'; ctx.beginPath(); ctx.arc(joy.ox+(d?dx/d*m:0), joy.oy+(d?dy/d*m:0), 22, 0, 6.2832); ctx.fill(); ctx.strokeStyle=COL.ink; ctx.lineWidth=2.5; ctx.stroke(); }
 
-let frameDt = 0;
+const PACE = { next:0 };
+// the static ground (grass, road, plaza, lanes, tufts, yards, hedges) is painted once into 320 px tiles at the exact
+// screen scale and stamped 1:1, so phones skip redrawing the whole farm's paths every frame with no visible change
+const GROUND = { tiles:new Map(), scale:0, key:'', T:320 };
+function drawGroundCached(zz, tx, ty){
+  const sc = dpr*zz, key = (S.homeBuilt?1:0)+'|'+(QUAL.lv<2?1:0), T = GROUND.T;
+  if (GROUND.scale!==sc || GROUND.key!==key){ GROUND.tiles.clear(); GROUND.scale = sc; GROUND.key = key; }
+  const i0 = Math.floor(-tx/T), i1 = Math.floor((W*dpr-tx)/T), j0 = Math.floor(-ty/T), j1 = Math.floor((H*dpr-ty)/T);
+  let built = 0, missing = false;
+  for (let j=j0-1; j<=j1+1; j++) for (let i=i0-1; i<=i1+1; i++){   // one ring of tiles ahead, built two per frame at most
+    const k = i+','+j; let t = GROUND.tiles.get(k);
+    if (!t){ const visible = i>=i0 && i<=i1 && j>=j0 && j<=j1; if (built<2 || (visible && built<6)){ t = buildGroundTile(i, j, sc); GROUND.tiles.set(k, t); built++; } else if (visible) missing = true; }
+    else { GROUND.tiles.delete(k); GROUND.tiles.set(k, t); }   // keep recently used tiles at the end (LRU)
+  }
+  while (GROUND.tiles.size > 56) GROUND.tiles.delete(GROUND.tiles.keys().next().value);
+  if (missing){ drawGround(); return; }   // a frame where tiles are still being made: draw it live, as before
+  ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0);
+  for (let j=j0; j<=j1; j++) for (let i=i0; i<=i1; i++) ctx.drawImage(GROUND.tiles.get(i+','+j), tx+i*T, ty+j*T);
+  ctx.restore(); }
+function buildGroundTile(i, j, sc){ const T = GROUND.T, c = document.createElement('canvas'); c.width = c.height = T; const g = c.getContext('2d');
+  g.setTransform(sc, 0, 0, sc*TILT, -i*T, -j*T); const saved = ctx; ctx = g; try { drawGround(); } finally { ctx = saved; } return c; }
+let frameDt = 0, DECOR_SMALL = null, DECOR_TALL = null; const LAYER = [], byY = (a,b)=>a.y-b.y;
 function render(){
   ctx.setTransform(dpr,0,0,dpr,0,0); const sky = ctx.createLinearGradient(0,0,0,H); const nn = nightAmt(); sky.addColorStop(0, nn<0.5 ? mix('#bfe9ff','#ffb88a',nn*2) : mix('#ffb88a','#3b3f7a',(nn-0.5)*2)); sky.addColorStop(1, nn<0.5 ? mix('#8fd3ff','#ffd0a0',nn*2) : mix('#ffd0a0','#5a4f9a',(nn-0.5)*2)); ctx.fillStyle = sky; ctx.fillRect(0,0,W,H);
   const sx = shake>0 ? rnd(-shake,shake) : 0, sy = shake>0 ? rnd(-shake,shake) : 0, zz = zoom*(1+zoomKick);
-  ctx.setTransform(dpr*zz, 0, 0, dpr*zz*TILT, dpr*(W/2-(cam.x+sx)*zz), dpr*(H/2-(cam.y+sy)*zz*TILT));
-  drawGround();
+  const tx = Math.round(dpr*(W/2-(cam.x+sx)*zz)), ty = Math.round(dpr*(H/2-(cam.y+sy)*zz*TILT));   // whole device pixels: cached tiles stay pin-sharp
+  ctx.setTransform(dpr*zz, 0, 0, dpr*zz*TILT, tx, ty);
+  if (MOBILE && zoomKick<0.001 && !SPRITE) drawGroundCached(zz, tx, ty); else drawGround();
   for (const f of S.fields) drawField(f);
   drawSellMat();
   for (const p of pads) if (padAvail(p) || (p.type==='field' && p.f.unlocked)) drawPad(p);
   drawPond(); drawFlockShadows(); drawEggs(); drawGift(); drawTrail();
-  const smalls = DECOR.filter(d=>!TALL.has(d.type)); for (const d of smalls) drawDecorItem(d);
+  if (!DECOR_SMALL){ DECOR_SMALL = DECOR.filter(d=>!TALL.has(d.type)); DECOR_TALL = DECOR.filter(d=>TALL.has(d.type)); }
+  for (const d of DECOR_SMALL) drawDecorItem(d);
   const stallObj = { type:'stall', y: MARKET.y+MARKET.h/2 }, homeObj = { type:'home', y: HOME.y }, barnObj = { type:'barn', y: BARN.y }, wmObj = { type:'wm', y: WM.y }, archObj = { type:'arch', y: GATE.y };
-  const layer = [P, ...hands, stallObj, barnObj, wmObj, archObj, ...LAMPS, ...(S.homeBuilt?[homeObj]:[]), ...(partnerActive()?[PT]:[]), ...(lenderVisible()?[ML]:[]), ...DECOR.filter(d=>TALL.has(d.type))].sort((a,b)=>a.y-b.y);
+  const layer = LAYER; layer.length = 0; layer.push(P, stallObj, barnObj, wmObj, archObj); for (const h of hands) layer.push(h); for (const l of LAMPS) layer.push(l);
+  if (S.homeBuilt) layer.push(homeObj); if (partnerActive()) layer.push(PT); if (lenderVisible()) layer.push(ML);
+  for (const d of DECOR_TALL) if (inView(d.x, d.y, 260)) layer.push(d);   // off-screen trees and props skip the sort entirely
+  layer.sort(byY);
   for (const o of layer){ if (o===P) drawChar(P, true); else if (o.type==='stall') drawStall(); else if (o.type==='home') drawHome(); else if (o.type==='barn') drawBarn(); else if (o.type==='wm') drawWindmill(); else if (o.type==='arch') drawArch(); else if (o.type==='lamp') drawLamp(o); else if (o===ML) drawLender(); else if (TALL.has(o.type)) drawDecorItem(o); else drawChar(o, false); }
   drawFliers(); if (!QUAL.lv){ drawBugs(); drawPetals(); } drawParts(); drawArrows(); drawGuide(); drawPops(); drawFlock();
   drawAtmosphere();
-  ctx.setTransform(dpr*zz, 0, 0, dpr*zz*TILT, dpr*(W/2-(cam.x+sx)*zz), dpr*(H/2-(cam.y+sy)*zz*TILT)); drawFireflies(); drawGlows();
+  ctx.setTransform(dpr*zz, 0, 0, dpr*zz*TILT, tx, ty); drawFireflies(); drawGlows();
   if (levelFlash>0){ ctx.setTransform(dpr,0,0,dpr,0,0); ctx.fillStyle = `rgba(255,255,255,${levelFlash*0.35})`; ctx.fillRect(0,0,W,H); }
   drawUiCoins(); drawEdgePointer(); drawJoystick();
 }
@@ -2108,7 +2139,9 @@ function hud(L){
 // ---------- loop ----------
 let last = performance.now(), running = false, hiddenAt = 0;
 function frame(now){
-  requestAnimationFrame(frame); cgGameplay(running && !storyOpen); const raw = now-last; let dt = Math.min(0.05, raw/1000); last = now; if (running && !storyOpen && raw>0 && raw<250) adaptQuality(raw, dt); if (!running || storyOpen) { render(); return; }
+  requestAnimationFrame(frame);
+  if (MOBILE && !window.__step){ if (now - PACE.next > 60) PACE.next = now; if (now < PACE.next - 3.5) return; PACE.next += 1000/60; }   // phones: pace to 60 fps whatever the screen's refresh rate (90/120 Hz would double the work)
+  cgGameplay(running && !storyOpen); const raw = now-last; let dt = Math.min(0.05, raw/1000); last = now; if (running && !storyOpen && raw>0 && raw<250) adaptQuality(raw, dt); if (!running || storyOpen) { render(); return; }
   time += dt; frameDt = dt; updateCrops(dt); updatePlayer(dt); for (const h of hands) updateHand(h, dt); updateCam(dt);
   for (const c of [P, ...hands]){ c.bsq = Math.max(0, (c.bsq||0)-dt*5); c.happy = Math.max(0, (c.happy||0)-dt); for (const it of c.carry) if (it.t<1){ it.t = Math.min(1, it.t+dt*3.2); if (it.t>=1) c.bsq = 1; }
     if (c.moving && (c===P || !QUAL.lv)){ c.dustT = (c.dustT||0)+dt; if (c.dustT>(QUAL.lv>1 ? 0.26 : 0.13)){ c.dustT = 0; parts.push({ x:c.x-c.face*10+rnd(-4,4), y:c.y+20, vx:-c.face*25, vy:-18, life:0.45, t:0, color:'rgba(255,255,255,.75)', r:4, g:-30 }); } } }
@@ -2128,11 +2161,13 @@ document.addEventListener('visibilitychange', ()=>{ if (document.hidden){ hidden
 addEventListener('pagehide', save); addEventListener('beforeunload', save);
 
 // ---------- adaptive quality ----------
-function setQuality(lv){ lv = clamp(lv, 0, 2); if (lv===QUAL.lv) return; QUAL.lv = lv; QUAL.slowT = QUAL.fastT = 0; resize(); FIELD_CACHE.clear(); PLANT_CACHE.clear(); CHAR_CACHE.clear(); if (parts.length>PART_CAP[lv]) parts.splice(0, parts.length-PART_CAP[lv]); }
+function setQuality(lv){ lv = clamp(lv, 0, 2); if (lv===QUAL.lv) return; QUAL.lv = lv; QUAL.slowT = QUAL.fastT = 0; resize(); FIELD_CACHE.clear(); PLANT_CACHE.clear(); CHAR_CACHE.clear(); GROUND.tiles.clear(); if (parts.length>PART_CAP[lv]) parts.splice(0, parts.length-PART_CAP[lv]); }
 function applyGfx(){ const g = S.settings.gfx||'auto'; if (g==='high') setQuality(0); else if (g==='low') setQuality(2); }
 function adaptQuality(ms, dt){ if ((S.settings.gfx||'auto')!=='auto') return; QUAL.avg += (ms-QUAL.avg)*0.05;
-  if (QUAL.avg>24){ QUAL.slowT += dt; QUAL.fastT = 0; if (QUAL.slowT>2.5 && QUAL.lv<2){ setQuality(QUAL.lv+1); QUAL.avg = 16.7; } }   // under ~40 fps for a few seconds: go lighter
-  else { QUAL.slowT = Math.max(0, QUAL.slowT-dt); if (QUAL.avg<12){ QUAL.fastT += dt; if (QUAL.fastT>40 && QUAL.lv>0){ setQuality(QUAL.lv-1); QUAL.avg = 16.7; } } else QUAL.fastT = 0; } }   // lots of headroom for a long while: try one step richer
+  QUAL.jank = QUAL.jank*Math.pow(0.5, dt/2) + (ms>40 ? 1 : 0);   // dropped frames, decaying with a 2 s half-life
+  if (QUAL.jank>12 && QUAL.lv<2){ setQuality(QUAL.lv+1); QUAL.jank = 0; QUAL.avg = 16.7; return; }   // frequent hitches feel laggy even when the average looks fine
+  if (QUAL.avg>28){ QUAL.slowT += dt; QUAL.fastT = 0; if (QUAL.slowT>4 && QUAL.lv<2){ setQuality(QUAL.lv+1); QUAL.avg = 16.7; } }   // under ~40 fps for a few seconds: go lighter
+  else { QUAL.slowT = Math.max(0, QUAL.slowT-dt); if (QUAL.avg<(MOBILE ? 17.2 : 12) && QUAL.jank<0.5){ QUAL.fastT += dt; if (QUAL.fastT>40 && QUAL.lv>0){ setQuality(QUAL.lv-1); QUAL.avg = 16.7; } } else QUAL.fastT = 0; } }   // lots of headroom for a long while: try one step richer
 
 // ---------- story cards ----------
 let storyOpen = false, storyT = 0;

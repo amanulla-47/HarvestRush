@@ -418,9 +418,25 @@ home, festival) the game adapts to the device:
 - **Sprinklers** spray by time (not per frame, which doubled the drops on 120 Hz phones) and only
   for fields on screen. A maxed farm went from ~500 live water drops to ~110.
 - **Off-screen particles** are skipped when drawing.
-- **Worker sprites** (`CHAR_CACHE`, lighter levels): each worker is stamped from a cached image per
-  look, facing, walk frame (8) and basket fill, with 94% reuse; the farmer you control is drawn live.
+- **Worker sprites** (`CHAR_CACHE`, phones and lighter levels): each worker is stamped from a cached image per
+  look, facing, walk frame (12) and basket fill, with 94% reuse; the farmer you control is drawn live.
 - On a 402×874 phone screen, the lowest level draws 4× fewer pixels than High.
+- **Phones keep full quality** (2× resolution, everything on). Instead of lowering quality, the
+  expensive parts are cached with no visible change:
+  - **Ground tiles** (`GROUND`): grass, road, plaza, lanes, tufts, yards and hedges are painted once
+    into 320 px tiles at the exact screen scale and stamped 1:1 (the camera snaps to whole device
+    pixels). The ground went from ~13 ms to ~0.6–2.2 ms per frame on a phone-size view; under 0.15% of
+    pixels differ, by anti-aliasing rounding along the road edge. Tiles build two per frame, one ring
+    ahead of the view, up to 56 kept (~22 MB). Desktop still draws the ground live.
+  - **Worker sprites** at full resolution with 12 walk frames.
+- **Auto quality only as a last resort:** it steps down only for sustained trouble (average over 28 ms
+  for 4 s, or very frequent hitches); Settings ▸ Graphics ▸ High turns it off entirely.
+- **60 fps pacing on phones** (`PACE`): 90/120 Hz screens no longer double the work; frames are paced
+  to an average of 60 on any refresh rate.
+- **No per-frame garbage in the draw list:** decoration lists are split once, the y-sorted layer reuses
+  one array, and only on-screen trees and props are sorted (about 28 of 162 at a time).
+- **No WebView scrolling:** touchmove is blocked outside the settings and chapter cards, and
+  `overscroll-behavior: none` stops bounce and pull-to-refresh fighting the drag joystick.
 
 ## CrazyGames
 
