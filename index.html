@@ -2214,7 +2214,9 @@ applyName(); applyGfx();
 P.carry = S.carry; S.level = levelFromTotal(S.total).l; dispCoins = S.coins; if (S.debtPaid) ML.leave = 1;   // he's long gone on later visits
 document.fonts && document.fonts.ready.then(()=>{ spriteCache.clear(); CHAR_CACHE.clear(); });
 if (S.name && (S.pendingAway||0)>=1){ $('#overlay').classList.add('hide'); showAway(away); try { hud(); } catch(e){} }   // returning players go straight to their earnings
-if (DEBUG && /[?&]cover/.test(location.search)) setupCover();
+if (DEBUG && /[?&](cover|trailer)/.test(location.search)) setupCover();
+if (DEBUG && /[?&]trailer/.test(location.search)) setupTrailer();
+if (DEBUG && /[?&]keyart/.test(location.search)) setupKeyart();
 requestAnimationFrame(frame);
 }
 // ?debug&cover: stages a lively daytime farm with only the title, for store cover images (tools/covers.sh)
@@ -2226,12 +2228,98 @@ function setupCover(){ noSave = true; COVER = true; S.settings.gfx = 'high'; set
   S.level = levelFromTotal(S.total).l; P.carry = S.carry = [0,1,2,3,0,1,4,2,0,3,1,2].map(ci=>({ ci, t:1 }));
   const f0 = S.fields[0]; P.x = f0.x0-60; P.y = f0.cy-10; P.face = 1; FIELD_CACHE.clear();
   const st = document.createElement('style'); st.textContent = `#hud,#btns,#hint,#buy,#strip,#banner{display:none!important}
-    #coverTitle{position:fixed;left:0;right:0;top:5%;text-align:center;font-family:"Lilita One",Nunito,sans-serif;font-size:min(13vw,17vh);line-height:1;color:#ffb13d;letter-spacing:.02em;
-      -webkit-text-stroke:min(1.1vw,1.5vh) #3b3561;paint-order:stroke fill;text-shadow:0 min(1vw,1.3vh) 0 #3b3561, 0 min(2vw,2.6vh) min(3vw,4vh) rgba(59,53,97,.35);pointer-events:none;z-index:50}
+    #coverTitle{position:fixed;right:3.5%;bottom:4.5%;text-align:right;font-family:"Lilita One",Nunito,sans-serif;font-size:min(9vw,15vh);line-height:.92;color:#ffb13d;letter-spacing:.02em;
+      -webkit-text-stroke:min(.85vw,1.4vh) #3b3561;paint-order:stroke fill;text-shadow:0 min(.8vw,1.3vh) 0 #3b3561, 0 min(1.6vw,2.6vh) min(3vw,4vh) rgba(59,53,97,.4);pointer-events:none;z-index:50}
     #coverTitle span{display:block;color:#7cc85a}
-    @media (max-aspect-ratio:1/1){ #coverTitle{font-size:19vw;top:4%} }`;
-  document.head.appendChild(st); const t = document.createElement('div'); t.id = 'coverTitle'; t.innerHTML = 'HARVEST<span>RUSH</span>'; if (innerWidth/innerHeight>1.4) t.innerHTML = 'HARVEST <span style="display:inline">RUSH</span>'; document.body.appendChild(t);
+    @media (max-aspect-ratio:1/1){ #coverTitle{font-size:12.5vw} }
+    @media (max-aspect-ratio:3/4){ #coverTitle{font-size:14vw} }`;
+  st.id = 'coverStyle'; document.head.appendChild(st); const t = document.createElement('div'); t.id = 'coverTitle'; t.innerHTML = 'HARVEST<span>RUSH</span>'; document.body.appendChild(t);   // bottom-right corner, two lines
   running = true; }
+// ?debug&trailer: a scripted 20 s preview video, stepped frame by frame by tools/trailer.mjs (window.__step)
+// 0-1 s: the cover frame; then the title fades, the HUD fades in, and the farmer picks, sells, upgrades and picks again
+function setupTrailer(){ window.requestAnimationFrame = () => 0;   // no live loop: the recorder drives every frame
+  const TR = { t:0, phase:'cover', wait:0, now:1000 }; last = TR.now; S.coins = 13800; dispCoins = S.coins;
+  S.fields.forEach((f,i)=>{ if (f.unlocked) f.lv = 4; }); const f3 = S.fields[3]; f3.lv = 2; const pad = pads.find(p=>p.type==='field' && p.f===f3);   // golden soil re-sows itself, so fields stay full
+  hands.length = 3; S.up.hands = 3; const hs = document.createElement('style'); hs.textContent = '#hint{display:none!important}'; document.head.appendChild(hs);
+  P.carry = S.carry = []; S.fields[0].plots.forEach(p=>{ p.t = 1; p.sown = true; }); S.fields[1].plots.forEach(p=>{ p.t = 1; p.sown = true; });
+  const go = g => { keys.w = keys.a = keys.s = keys.d = false; if (!g) return false; const dx = g.x-P.x, dy = g.y-P.y; if (Math.abs(dx)<10 && Math.abs(dy)<10) return true; if (Math.abs(dx)>8) keys[dx>0?'d':'a'] = true; if (Math.abs(dy)>8) keys[dy>0?'s':'w'] = true; return false; };
+  const ripeIn = fi => { let best = null, bd = 1e9; for (const p of S.fields[fi].plots) if (p.t>=1 && p.sown){ const d = Math.hypot(p.x-P.x, p.y-P.y); if (d<bd){ bd = d; best = p; } } return best; };
+  function bot(){ const dt = 1/30; TR.t += dt;
+    const k = clamp((TR.t-1.0)/0.5, 0, 1); const title = $('#coverTitle'); if (title) title.style.opacity = 1-k;
+    if (k>0 && $('#coverStyle')){ $('#coverStyle').remove(); }
+    $('#hud').style.opacity = k; $('#btns').style.opacity = k;
+    if (TR.t<1.1){ go(null); return; }
+    if (TR.phase==='cover') TR.phase = 'pick1';
+    if (TR.phase==='pick1'){ if (P.carry.length>=16 || TR.t>8) TR.phase = 'sell'; else go(ripeIn(0)); }
+    else if (TR.phase==='sell'){ if (!P.carry.length){ TR.phase = 'toPad'; } else go(RUG()); }
+    else if (TR.phase==='toPad'){ if (go({ x:pad.x, y:pad.y-10 })){ TR.phase = 'look'; TR.wait = 0.7; } }
+    else if (TR.phase==='look'){ go(null); TR.wait -= dt; if (TR.wait<=0){ tryBuy(); dismissBuy(); TR.phase = 'pick2'; } }   /* hide the next level's card while he walks off */   // walk straight off the sign so the next card doesn't open
+    else if (TR.phase==='pick2' && P.carry.length>=capOf()-1) TR.phase = 'sell2';
+    else if (TR.phase==='sell2'){ if (!P.carry.length) TR.phase = 'pick2'; else go(RUG()); }
+    else if (TR.phase==='pick2'){ let best = null, bd = 1e9; for (const f of S.fields) if (f.unlocked) for (const p of f.plots) if (p.t>=1 && p.sown){ const d = Math.hypot(p.x-P.x, p.y-P.y) - (f===f3 ? 120 : 0); if (d<bd){ bd = d; best = p; } } go(best); }
+  }
+  window.__step = () => { bot(); TR.now += 1000/30; frame(TR.now); return (window.__lastPhase = TR.phase); };
+  window.__trailerReady = false; (document.fonts ? document.fonts.ready : Promise.resolve()).then(()=>setTimeout(()=>{ spriteCache.clear(); CHAR_CACHE.clear(); for (let i=0;i<3;i++){ TR.now += 1000/30; frame(TR.now); } window.__trailerReady = true; }, 600));
+}
+// ?debug&cover&keyart: premium store art. The farm (zoomed, soft focus, golden-hour grade) is the backdrop;
+// the hero is redrawn large and sharp on top with a bursting basket, flying coins, sun rays and a glossy title.
+function setupKeyart(){
+  const W0 = innerWidth, H0 = innerHeight, land = W0/H0 > 1.3, port = W0/H0 < 0.9;
+  ['coverTitle'].forEach(id=>{ const e = document.getElementById(id); if (e) e.remove(); });
+  window.updateCam = () => {};   // a fixed, composed camera
+  zoom = land ? 1.05 : port ? 0.95 : 1.0; const f0 = S.fields[0], f1 = S.fields[1];
+  cam.x = land ? (f1.cx+f0.cx)/2 + 40 : (f1.cx+f0.cx)/2; cam.y = land ? f0.cy - 120 : port ? f0.cy + 60 : f0.cy - 20;
+  P.x = -900; P.y = -900; hands.length = 3; S.up.hands = 3;   // the hero is drawn by the overlay, not in the scene
+  const st = document.createElement('style'); st.textContent = `
+    #c{filter:blur(${land ? 2.2 : 1.8}px) saturate(1.18) brightness(1.04)}
+    #kaGrade{position:fixed;inset:0;pointer-events:none;z-index:20;background:
+      radial-gradient(ellipse at ${land ? '78% 8%' : '80% 6%'}, rgba(255,226,140,.55) 0%, rgba(255,200,110,.18) 30%, rgba(255,190,100,0) 60%),
+      linear-gradient(180deg, rgba(255,214,140,.12), rgba(255,170,90,.10) 70%, rgba(120,60,90,.18));mix-blend-mode:soft-light}
+    #kaVig{position:fixed;inset:0;pointer-events:none;z-index:21;background:radial-gradient(ellipse at 45% 45%, rgba(0,0,0,0) 55%, rgba(40,30,70,.38) 100%)}
+    #ka{position:fixed;inset:0;z-index:30;pointer-events:none}
+    #kaTitle{position:fixed;right:${land ? 3.2 : 4}%;bottom:${land ? 5 : 3.5}%;z-index:40;text-align:right;font-family:"Lilita One",Nunito,sans-serif;line-height:.86;letter-spacing:.01em;
+      font-size:${land ? 'min(10.5vw,19vh)' : port ? '17.5vw' : '15vw'};pointer-events:none}
+    #kaTitle .ln{display:block;position:relative}
+    #kaTitle .bk{position:absolute;inset:0;color:#3b3561;-webkit-text-stroke:.17em #3b3561;
+      text-shadow:0 .08em 0 #3b3561, 0 .1em 0 #2a2548, 0 .22em .25em rgba(30,20,60,.45)}
+    #kaTitle .fr{position:relative;-webkit-background-clip:text;background-clip:text;color:transparent;-webkit-text-stroke:.025em rgba(255,255,255,.55)}
+    #kaTitle .h .fr{background-image:linear-gradient(180deg,#fff7c2 0%,#ffe066 30%,#ffb627 62%,#f27b12 100%)}
+    #kaTitle .r .fr{background-image:linear-gradient(180deg,#f2ffc4 0%,#b9f06a 34%,#6fcf47 66%,#3d9a35 100%)}
+    #kaTitle .r{margin-right:.06em}`;
+  document.head.appendChild(st);
+  for (const id of ['kaGrade','kaVig']){ const d = document.createElement('div'); d.id = id; document.body.appendChild(d); }
+  const t = document.createElement('div'); t.id = 'kaTitle';
+  t.innerHTML = ['HARVEST','RUSH'].map((w,i)=>`<span class="ln ${i?'r':'h'}"><span class="bk">${w}</span><span class="fr">${w}</span></span>`).join('');
+  document.body.appendChild(t);
+  const cv = document.createElement('canvas'); cv.id = 'ka'; cv.width = W0; cv.height = H0; document.body.appendChild(cv);
+  const paint = () => { const g = cv.getContext('2d'), saved = ctx; ctx = g; SPRITE = true;
+    try {
+      g.clearRect(0, 0, W0, H0);
+      // sun rays from the top-right
+      const sx = W0*(land ? 0.8 : 0.82), sy = -H0*0.08; g.save(); g.globalCompositeOperation = 'lighter';
+      for (let i=0;i<9;i++){ const a = Math.PI*0.52 + i*0.11 + (i%2)*0.03, len = Math.hypot(W0,H0)*1.1, w = 0.025+0.02*(i%3);
+        const gr = g.createLinearGradient(sx, sy, sx+Math.cos(a)*len, sy+Math.sin(a)*len); gr.addColorStop(0,'rgba(255,236,170,.22)'); gr.addColorStop(1,'rgba(255,236,170,0)');
+        g.fillStyle = gr; g.beginPath(); g.moveTo(sx, sy); g.lineTo(sx+Math.cos(a-w)*len, sy+Math.sin(a-w)*len); g.lineTo(sx+Math.cos(a+w)*len, sy+Math.sin(a+w)*len); g.closePath(); g.fill(); }
+      g.restore();
+      // the hero, big and sharp
+      const k = land ? H0/290 : port ? W0/265 : W0/300, hx = W0*(land ? 0.34 : port ? 0.44 : 0.33), hy = H0*(land ? 0.7 : port ? 0.5 : 0.56);
+      g.save(); g.translate(hx, hy+26*k); g.fillStyle = 'rgba(40,30,60,.28)'; g.beginPath(); g.ellipse(0, 0, 30*k, 9*k, 0, 0, 6.2832); g.fill(); g.restore();   // ground shadow
+      const glow = g.createRadialGradient(hx, hy-20*k, 10*k, hx, hy-20*k, 120*k); glow.addColorStop(0,'rgba(255,240,180,.55)'); glow.addColorStop(1,'rgba(255,240,180,0)'); g.fillStyle = glow; g.fillRect(0,0,W0,H0);
+      const sv = { x:P.x, y:P.y, face:P.face, moving:P.moving, bob:P.bob, happy:P.happy, carry:P.carry, bsq:P.bsq };
+      Object.assign(P, { x:0, y:0, face:1, moving:true, bob:0.9, happy:1, bsq:0, carry:[3,0,2,1,4,0,2,3].map(ci=>({ ci, t:1 })) });
+      g.save(); g.translate(hx, hy); g.scale(k, k); drawFarmer(P, LOOKS.hero, LOOKS.hero.size, 99); g.restore(); Object.assign(P, sv);
+      // crops and coins bursting up out of the basket
+      const bx = hx - 26*k, by = hy - 48*k, items = ['🌾','🥕','🍅','🎃','🍓','🌽','🍇','🍉'];
+      const arc = (i, n, r0, spread) => { const a = -Math.PI/2 + 0.35 + (i-(n-1)/2)*spread; return [bx + Math.cos(a)*r0*1.25, by - 18*k + Math.sin(a)*r0]; };   // a fan up and to the right of the basket
+      for (let i=0;i<7;i++){ const [x,y] = arc(i, 7, (38 + (i%2)*14)*k, 0.34); drawEmoji(items[i], x, y, (13+(i%3)*2)*k, { rot:(i-3)*0.16 }); }
+      for (let i=0;i<9;i++){ const [x,y] = arc(i, 9, (60 + (i*29)%26)*k, 0.27); g.save(); g.translate(x, y); g.scale(1, 0.6+0.4*Math.abs(Math.cos(i*1.7))); drawCoin(0, 0, (5+(i%3)*1.2)*k); g.restore(); }
+      for (let i=0;i<12;i++){ const [x,y] = arc(i, 12, (30 + (i*23)%55)*k, 0.25); star(x + Math.sin(i*3.1)*14*k, y, (2+(i%3)*1.4)*k, i%2 ? '#fff6c4' : '#ffe066'); }
+      // soft-focus wheat in the foreground corner
+      const wf = plantSprite(S.fields[0], 1, true, false, true), ws = (land ? H0 : W0)/(land ? 260 : 300);
+      g.save(); g.filter = 'blur(6px)'; const wsz = ws*1.35; for (let i=0;i<3;i++){ const x = -SPR_W*wsz*0.25 + i*SPR_W*wsz*0.42, y = H0 + SPR_H*wsz*0.22 - (i===1 ? SPR_H*wsz*0.08 : 0); g.drawImage(wf, x - SPR_OX*wsz, y - SPR_OY*wsz, SPR_W*wsz, SPR_H*wsz); } g.restore();   // bottom-left corner only, clear of the hero
+    } finally { ctx = saved; SPRITE = false; } window.__kaReady = true; };
+  (document.fonts ? document.fonts.ready : Promise.resolve()).then(()=>setTimeout(paint, 700));
+}
 boot();
 
 if (DEBUG) window.FARM = { S, P, hands, pads, CROPS, keys, goal:()=>goalTarget(), view:()=>({ x:cam.x, y:cam.y, zoom }), order:()=>order, newOrder:()=>{ order = null; orderNext = 0; }, festival:()=>startFestival(), festReady:()=>festivalReady(), away:(sec)=>{ applyOffline(sec, true); showAway(sec); }, giftReset:(streak)=>{ S.daily = { day:dayKey(new Date()), streak:streak||1, claimed:false }; }, addCoins:n=>{ S.coins+=n; }, unlockAll:()=>{ S.fields.forEach(f=>f.unlocked=true); }, maxAll:()=>{ S.fields.forEach(f=>{ if (f.unlocked) f.lv = FIELD_UP.length; }); S.stallLv = STALL_UP.length; S.up.hands = HIRE_MAX; while (hands.length<S.up.hands) spawnHand(true); }, ripen:()=>{ S.fields.forEach(f=>f.plots.forEach(p=>p.t=1)); }, goldWheat:n=>{ S.fields[0].plots.slice(0,n||1).forEach(p=>{ p.sown=true; p.t=1; p.gold=true; }); }, goldCrop:(fi,n)=>{ S.fields[fi].plots.slice(0,n||1).forEach(p=>{ p.sown=true; p.t=1; p.gold=true; }); }, offline:applyOffline, idleRate, save, reset:resetAll, blockSave:()=>{ noSave = true; } };

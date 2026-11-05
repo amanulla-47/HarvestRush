@@ -446,8 +446,27 @@ Ready for a CrazyGames **Basic Launch** (SDK v3, no ads).
   chapter strip bottom-left, so the farmer in the middle stays visible.
 - **iOS audio:** any tap resumes an interrupted AudioContext.
 - **Build:** `tools/build-crazygames.sh` → `dist/harvest-rush-crazygames.zip` (index.html at the root).
-- **Covers:** with the local server running, `tools/covers.sh` renders `dist/covers/` at 1920×1080,
-  800×1200 and 800×800 from `?debug&cover` (a staged daytime farm with only the title).
+- **Covers and preview videos** (needs the local server on :8767, Chrome and ffmpeg):
+  - `node tools/trailer.mjs` records the two 19 s silent preview videos frame by frame from the real
+    game (`?debug&trailer`: a scripted farmer picks with a combo, sells, buys a pumpkin-field upgrade
+    and keeps harvesting) → `dist/video/harvest-rush-landscape-1920x1080.mp4` and
+    `-portrait-1080x1620.mp4`. Each video's first frame is saved as the matching cover
+    (`dist/covers/cover-landscape-1920x1080.png`, `cover-portrait-800x1200.png`), so cover and video
+    start identically, as CrazyGames asks.
+  - `tools/covers.sh` renders the square cover (`cover-square-800x800.png`) from `?debug&cover`.
+  - The title sits in the bottom-right corner; field signs, basket counters and the price board are
+    hidden in cover mode so the title is the only text.
+  - **Premium covers (recommended upload):** `dist/covers/codex/` holds key-art covers made by GPT
+    (Codex CLI image generation) from `store/codex-cover-brief.md`, with the game's own renders in
+    `store/refs/` as style references: the hero large with an overflowing basket, a burst of coins and
+    crops, golden-hour light, the glossy title bottom-right. The `-codex-cover.mp4` videos open on these
+    covers and crossfade into gameplay at 1.5 s. To regenerate:
+    `codex exec -C . -s workspace-write -i store/refs/ref-gameplay-landscape.png -i store/refs/ref-gameplay-portrait.png -i store/refs/ref-hero-closeup.jpg -i store/refs/ref-title-style.png - < store/codex-cover-brief.md`
+  - `tools/keyart.sh` renders an in-engine premium alternative (`dist/covers/premium-*.png`,
+    `?debug&cover&keyart`): the real hero redrawn large over a soft-focus farm, sun rays, a loot
+    fountain and a glossy gradient title. `tools/shoot.mjs` is its DevTools screenshot helper.
+  - `store/GPT_PROMPTS.md` has ready-to-paste ChatGPT prompts (style sheet, title lettering, one per
+    cover size, a video shot list) for painted alternatives.
 - **Local test:** `http://127.0.0.1:8767/` runs the SDK in local mode (console logs every event);
   add `&muteAudio=true` to test muting.
 
