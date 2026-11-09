@@ -1,0 +1,132 @@
+{
+  "versions": {
+    "Pillow": "11.3.0",
+    "fontTools": "4.60.2"
+  },
+  "atlases": [
+    {
+      "source": "assets/farm-painted-v1.png",
+      "production": "assets/farm-painted-v1.webp",
+      "sourceBytes": 1837082,
+      "productionBytes": 1255574,
+      "sourceSha256": "ddc1346af6e470b862349b9db3270fcfb35bf71150083cd704d08a7c1dfc3eb6",
+      "productionSha256": "9d137d73ce26edd21a2061893a994707a09ba5df11f61f2cfc2c6453c1eb2013",
+      "width": 1536,
+      "height": 1024,
+      "rgbaSha256": "948f66a25e991992feafa304d40edca6d1b4b0f38acbd9ddec2da17bb1221c5d",
+      "pixelIdentical": true,
+      "iccProfileUnchanged": true
+    },
+    {
+      "source": "assets/crops-painted-v2.png",
+      "production": "assets/crops-painted-v2.webp",
+      "sourceBytes": 1581576,
+      "productionBytes": 1111066,
+      "sourceSha256": "202106ecade012bd188fa469ab2fd6c01a6af73d426686356a4b3b4f204db4a4",
+      "productionSha256": "dc21564c371ac8c01e6bc9660b4f4f8855c67201cdd10b217a34fec42b1776a5",
+      "width": 1774,
+      "height": 887,
+      "rgbaSha256": "f79cab0be963eee15538f750eb77662d9e70a3d59bf344a7a8bd6691b137ec49",
+      "pixelIdentical": true,
+      "iccProfileUnchanged": true
+    },
+    {
+      "source": "assets/props-painted-v1.png",
+      "production": "assets/props-painted-v1.webp",
+      "sourceBytes": 1367744,
+      "productionBytes": 983518,
+      "sourceSha256": "4a375fcfa1c5532ac37fe066ccd05fa51f5836cfb46d59f0728abaca8f74334c",
+      "productionSha256": "fb918a2e65565a77f5e3e1b07775ec28fbf9a96e5d26ea0c7d1a28965a89a6ef",
+      "width": 1448,
+      "height": 1086,
+      "rgbaSha256": "a3f6cec1c7c248c9bc26b616bc60f1ea37995bfe0d7434f1a94777af6163d00f",
+      "pixelIdentical": true,
+      "iccProfileUnchanged": true
+    },
+    {
+      "source": "assets/terrain-painted-v1.png",
+      "production": "assets/terrain-painted-v1.webp",
+      "sourceBytes": 1681496,
+      "productionBytes": 1153188,
+      "sourceSha256": "615a85b36d5340c39069e2009e0536bc136dc1aefb2ffe78c2a0e7a6dba305ed",
+      "productionSha256": "82f63251f46a3a32bd6bb5263ea15e2046db664bb62645cad5174331f062769c",
+      "width": 1254,
+      "height": 1254,
+      "rgbaSha256": "ed2be19b169be2ac214b1aee3779bce3783c4f5e5236e42619c561692f1283fe",
+      "pixelIdentical": true,
+      "iccProfileUnchanged": true
+    }
+  ],
+  "fonts": [
+    {
+      "source": "assets/fonts/lilita-one.ttf",
+      "production": "assets/fonts/lilita-one.woff2",
+      "sourceBytes": 26332,
+      "productionBytes": 11284,
+      "sourceSha256": "26ad0d77404141ff7af714353cdf23c980841829dd270fc26e6c2dfcf654bd6d",
+      "productionSha256": "1072a6f9f07e2ec9422857fabcfa51a23ae04808fc2bb358846597dd84457b40",
+      "glyphCount": 228,
+      "characterCount": 225,
+      "glyphXmlSha256": "d712107e8e7c88cf9b80381f6924dcecdb505b86c63e6c78aabd49dbf6e77402",
+      "outlinesAndHintsIdentical": true,
+      "metricsAndCoverageIdentical": true,
+      "otherFontTablesIdentical": true
+    },
+    {
+      "source": "assets/fonts/nunito-600.ttf",
+      "production": "assets/fonts/nunito-600.woff2",
+      "sourceBytes": 125536,
+      "productionBytes": 42388,
+      "sourceSha256": "1506fc96971e84d1a4ca89f0d1157a881b9ce217bbfa05d2b3c9e3c8f6723091",
+      "productionSha256": "89208869342537846602d357c825cefc319e124b3a6701a1d5db271c90587627",
+      "glyphCount": 1050,
+      "characterCount": 938,
+      "glyphXmlSha256": "907218d41bbc40e57daab41e92b7747d5beb20f2964ab3ad735b11c533d826b5",
+      "outlinesAndHintsIdentical": true,
+      "metricsAndCoverageIdentical": true,
+      "otherFontTablesIdentical": true
+    },
+    {
+      "source": "assets/fonts/nunito-700.ttf",
+      "production": "assets/fonts/nunito-700.woff2",
+      "sourceBytes": 125464,
+      "productionBytes": 41636,
+      "sourceSha256": "1a025dfce6e6e03bbe31ba82277ec5ed96df8b8dd58b3df6267269490b90b1dc",
+      "productionSha256": "148fdc2209e706a2bd4533234f43be9ff74c7b2814768c0fe0a3a19d6a30466a",
+      "glyphCount": 1050,
+      "characterCount": 938,
+      "glyphXmlSha256": "342b469f01b28eb3a6322d2ee896b96eb11e92963288896bf2d936c2bce0d4d1",
+      "outlinesAndHintsIdentical": true,
+      "metricsAndCoverageIdentical": true,
+      "otherFontTablesIdentical": true
+    },
+    {
+      "source": "assets/fonts/nunito-800.ttf",
+      "production": "assets/fonts/nunito-800.woff2",
+      "sourceBytes": 125416,
+      "productionBytes": 42744,
+      "sourceSha256": "c5776505c7b3df3c3ca763477b795d6bbc6517760bede0462ab77d1fb44954a6",
+      "productionSha256": "142f5abac3976262a6ab9e670e323f42da2973b2cd97424c466ce61fc1c7b588",
+      "glyphCount": 1050,
+      "characterCount": 938,
+      "glyphXmlSha256": "a5d713d1faf2522dbe372114f0883d5cb7e3e29cf6cfec3cbd6a81de66147b54",
+      "outlinesAndHintsIdentical": true,
+      "metricsAndCoverageIdentical": true,
+      "otherFontTablesIdentical": true
+    },
+    {
+      "source": "assets/fonts/nunito-900.ttf",
+      "production": "assets/fonts/nunito-900.woff2",
+      "sourceBytes": 125376,
+      "productionBytes": 42752,
+      "sourceSha256": "9caa6d5464d4438c3092a05d47952099e208862cacd5f655acb64012a1a15e78",
+      "productionSha256": "1ecf3d9d62c4ae36ea6af6d82b74f87783d2d4f4cc42e485e62c9618428bd563",
+      "glyphCount": 1050,
+      "characterCount": 938,
+      "glyphXmlSha256": "1a3443d8c0c947b2e4a092c6aae7bb4dd934482a07750def6dec3bef659f5c46",
+      "outlinesAndHintsIdentical": true,
+      "metricsAndCoverageIdentical": true,
+      "otherFontTablesIdentical": true
+    }
+  ]
+}

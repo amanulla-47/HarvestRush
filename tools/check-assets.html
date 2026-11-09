@@ -1,0 +1,27 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><title>Harvest Rush lossless asset verification</title><style>body{font:16px system-ui;margin:28px;background:#f7f3e7;color:#263f2d}button{font:inherit;padding:12px 20px}li{padding:7px}canvas{max-width:100%;border:1px solid #c6c0ad;background:#fff}pre{white-space:pre-wrap}</style><h1>Lossless asset verification</h1><button id="run">Verify images and fonts</button><p id="status" role="status">Ready</p><ul id="results"></ul><canvas id="sample" width="1024" height="400"></canvas><script>
+const status=document.querySelector('#status'),results=document.querySelector('#results');
+const loadImage=async src=>{if(src.endsWith('.webp'))return createImageBitmap(await fetch(src).then(r=>r.blob()),{premultiplyAlpha:'none'});const im=new Image();im.src=src;await im.decode();return im;};
+function pixels(image){const c=document.createElement('canvas');c.width=image.naturalWidth||image.width;c.height=image.naturalHeight||image.height;const x=c.getContext('2d',{willReadFrequently:true});x.drawImage(image,0,0);return x.getImageData(0,0,c.width,c.height).data;}
+function differences(a,b){if(a.length!==b.length)throw Error('Array dimensions differ');let n=0;for(let i=0;i<a.length;i++)if(a[i]!==b[i])n++;return n;}
+function pass(text){const li=document.createElement('li');li.textContent=text;results.appendChild(li);}
+function paintText(family,weight){const c=document.createElement('canvas');c.width=1024;c.height=400;const x=c.getContext('2d');x.fillStyle='#30452b';let y=30;for(const size of [14,24,32]){x.font=weight+' '+size+'px "'+family+'"';for(const line of ['Harvest Rush · Ravi’s Farm','COINS 1,234 / 50M — Upgrade','Lv 2 → Lv 3 · Need 122 more','Aa ÁÉÍÓÚ äöü ñ ç ß 0123456789']){x.fillText(line,8,y);y+=size+4;}}return c;}
+document.querySelector('#run').onclick=async()=>{results.replaceChildren();status.textContent='Checking…';try{
+ const manifest=await fetch('../assets/optimized-assets.json').then(r=>r.json());let n=0;
+ for(const e of manifest.atlases){const [a,b]=await Promise.all([loadImage('../'+e.source),loadImage('../'+e.production)]);if((a.naturalWidth||a.width)!==(b.naturalWidth||b.width)||(a.naturalHeight||a.height)!==(b.naturalHeight||b.height))throw Error('Image dimensions differ');const pa=pixels(a),pb=pixels(b),d=differences(pa,pb);if(d){let max=0,opaque=0,alpha=0;const samples=[];for(let j=0;j<pa.length;j++)if(pa[j]!==pb[j]){max=Math.max(max,Math.abs(pa[j]-pb[j]));if(j%4===3)alpha++;else if(pa[j-j%4+3]===255)opaque++;if(samples.length<6)samples.push([j,pa[j],pb[j],pa[j-j%4+3]]);}throw Error(e.production+': '+JSON.stringify({different:d,maxDelta:max,opaqueDifferences:opaque,alphaDifferences:alpha,samples}));}pass('PASS '+e.production+' · zero differing browser RGBA channels');n++;}
+ const originalCrop=await loadImage('../assets/crops-painted-v2.png'),optimizedCrop=await loadImage('../assets/crops-painted-v2.webp');
+ const gameSource=await fetch('../index.html').then(r=>r.text()),meta=JSON.parse(gameSource.match(/const ATLAS_META=(.*);/)[1]);
+ for(const [i,rect]of meta['assets/crops-painted-v2.webp'].rects.entries()){
+  const [sx,sy,w,h]=rect,make=im=>{const c=document.createElement('canvas');c.width=w;c.height=h;c.getContext('2d').drawImage(im,sx,sy,w,h,0,0,w,h);return c;};
+  const expected=make(originalCrop),actual=make(optimizedCrop);
+  if(differences(pixels(expected),pixels(actual)))throw Error('Popup crop '+i+' differs');
+ }
+ pass('PASS all 8 popup crop icons · zero differing browser RGBA channels');
+ for(const [i,e]of manifest.fonts.entries()){
+  const weight=(e.source.match(/-(\d+)\.ttf/)||[])[1]||'400',aName='Original'+i,bName='Optimized'+i;
+  const [a,b]=await Promise.all([new FontFace(aName,'url(../'+e.source+')',{weight}).load(),new FontFace(bName,'url(../'+e.production+')',{weight}).load()]);document.fonts.add(a);document.fonts.add(b);
+  const x=paintText(aName,weight),y=paintText(bName,weight),d=differences(x.getContext('2d').getImageData(0,0,1024,400).data,y.getContext('2d').getImageData(0,0,1024,400).data);
+  if(d)throw Error(e.production+': '+d+' differing text-render channels');pass('PASS '+e.production+' · identical rasterized labels at 14, 24 and 32 px');document.querySelector('#sample').getContext('2d').drawImage(y,0,0);n++;
+ }
+ status.textContent='PASS · '+n+' / 9 assets · zero differing browser image/text channels';
+}catch(e){status.textContent='FAIL · '+e.message;console.error(e);}};
+</script></html>

@@ -1,0 +1,10 @@
+import { build } from 'esbuild';
+import { copyFile, mkdir, readFile } from 'node:fs/promises';
+import { fileURLToPath } from 'node:url';
+import { Script } from 'node:vm';
+const html=await readFile(new URL('../index.html',import.meta.url),'utf8');
+new Script([...html.matchAll(/<script(?: [^>]*)?>([\s\S]*?)<\/script>/g)].map(m=>m[1]).join('\n'),{filename:'index.html'});
+await mkdir(new URL('../assets/vendor/',import.meta.url),{recursive:true});
+await build({entryPoints:[fileURLToPath(new URL('../src/farm-three-scene.mjs',import.meta.url))],outfile:fileURLToPath(new URL('../assets/harvest-three.js',import.meta.url)),bundle:true,format:'iife',minify:true,target:['es2020'],legalComments:'eof'});
+await copyFile(new URL('../node_modules/three/LICENSE',import.meta.url),new URL('../assets/vendor/three-LICENSE.txt',import.meta.url));
+console.log('Built local Three.js renderer and license.');

@@ -1,411 +1,83 @@
 # HARVEST RUSH — farming idle arcade
 
-A top-down idle arcade farmer that runs entirely in the browser. Single `index.html`,
-no build step, no assets: a cute cartoon look drawn with the 2D canvas API, seen flat from above (`TILT` is 1;
-lower values would squash the ground into a 2.5D tilt). Farmers, crops, trees and the market stall
-are drawn standing up via `standUp()`; fields and pads are raised blocks with front
-faces, the stall has a roof and side wall, shadows lie on the ground, and the farm sits on a floating island with a cliff edge. Crops are emoji, sound effects and a soft music loop synthesized with WebAudio, progress saved
-in localStorage.
+A painted farming idle arcade game rendered with **Three.js r187**. An orthographic
+camera preserves the existing 2D art direction. Instanced sprite batches draw the
+world, characters, crop growth stages, particles, lighting and screen effects through
+one WebGL2 canvas. Movement, economy, progression, saves and the compact HTML/CSS
+HUD retain their existing behavior. Vertical camera following has no dead zone; Ravi stays just above the screen
+midpoint, including at map edges.
 
-## Run
+Ravi's visual stride eases in and settles on release while movement and collision
+respond immediately. A short turn compression and restrained basket sway use GPU
+transforms. Crop pickups lift clear of the soil before travelling into the basket;
+selling uses a short arc with one coin sound, wallet flight and summary when the
+last item arrives. Workers remain quiet. `src/animation.mjs` holds these motion
+curves; `tools/check-animation.mjs` verifies their timing and endpoints.
 
-    python3 -m http.server 8767 --directory HarvestRush
-    # then open http://localhost:8767
+The tutorial has three visible actions: walk through six wheat, stand on the market
+rug to sell, then stop at the wheat sign and tap Upgrade. One card supplies the
+instruction and progress. Small cyan dots flow toward the goal, with a slightly
+larger dot marking the destination. Their white edges and dark outlines separate
+them from the farm. The trail bends around buildings, fades gently at its ends,
+and disappears on arrival. There are no navigation arrows or solid route line.
+Sowing is automatic, and egg collection becomes an optional
+goal after the first upgrade. The original starting rewards and saved quest indices
+are retained; older saves at the sowing lesson move forward without losing rewards.
+After the lesson, the tutorial stays complete. Contextual reminders appear for six
+seconds when the basket fills or after 18 seconds of inactivity, with cooldowns to
+avoid repeated prompts. Movement/input dismisses idle help; selling clears full-bag
+help. Cards and notifications take precedence over reminders. Upgrade cards open
+as soon as the player enters an eligible zone, without dwell or notification delays;
+a deliberate button press is still required to buy. Active crop transfers finish
+before a purchase card opens. `NIGHT_ENABLED` is false: all sessions stay in daylight,
+including older night-debug URLs, until night mode is requested again.
 
-(`file://` works too, since there are no modules.)
+Daily gifts and timed orders remain deferred through the early optional goals.
+Saves retain partial first-basket bonuses and sale totals. Settings, lost pointer
+capture, blur and hidden tabs clear input; hidden tabs pause simulation and mute
+audio. `tools/check-opening.mjs` covers the shared instruction/target model,
+progression, prompt timing, save migration, input reset and platform storage
+fallback. This build requests no advertisements; live ad callback testing remains
+for a later SDK ads integration.
 
-## Controls
+The renderer uses four lossless WebP atlases derived from the preserved original PNGs. Individual procedural assets such
+as character poses, baskets, labels and ground tiles are baked into reusable textures;
+the entire game frame is never painted into a CanvasTexture. Static textures are
+uploaded once, disposed after inactivity or cache eviction, and reused across frames.
+Crop sway, windmill rotation, smoke, pond motion and lighting run through GPU sprite
+transforms/shaders. Painter ordering and transparent edges are preserved.
 
-| Input                  | Action                                      |
-|------------------------|---------------------------------------------|
-| Drag anywhere (touch or mouse) | Virtual joystick: move the farmer   |
-| WASD / arrow keys      | Move                                        |
-| Walk over a ripe crop  | Harvest it into your bag                    |
-| Walk onto the SELL mat | Sell your bag, one item at a time           |
-| Gate post, rug, barn   | The button that appears (or Space/Enter) upgrades or buys |
+`src/three-renderer.mjs` owns Three.js, instancing, texture lifetime and color/tint
+shaders. `src/farm-three-scene.mjs` connects simulation state and the existing asset
+painters to that renderer. `assets/harvest-three.js` is the locally bundled runtime;
+no Three.js CDN is required when playing or uploading to CrazyGames. The bundled
+Three.js MIT license is in `assets/vendor/three-LICENSE.txt`.
 
-## Loop
+## Run and build
 
-1. **Harvest and sow.** Ripe crops pulse with a glow. Walking over them makes each crop fly
-   into the wicker basket strapped to the farmer's back, where it settles into neat rows (two
-   per row) that stack up behind the head, up to the bag capacity. A picked plot is bare soil
-   and grows nothing until it is sown: walk over it to scatter seeds (no cost, no menu).
-   Workers harvest first and sow bare soil on their way or when nothing is ripe; a field with
-   golden soil (its top level) sows itself. A bouncing arrow guides the
-   first harvest, the first sale and the first sowing.
-2. **Sell.** The market stall in the middle of the farm has a tiled roof with a hanging sign,
-   a striped canopy on posts with lanterns, a jar shelf, a counter with produce crates, an OPEN
-   board and a coin jar, barrels, crates, a grain sack and flower pots around it, and a plank
-   deck with a fringed, woven market rug, a little brass weighing scale and a SELL HERE signpost in
-   front. The rug glows while you carry crops. Step on the rug and crops arc out
-   of your basket to the shopkeeper, who waves with each one. Each crop type has its own price.
-3. **Upgrade things where they stand.** There is no shop. Walk up to something and one button
-   appears with a before-and-after line, and a bouncing green arrow marks anything you can
-   afford from across the farm:
-   - **Fields** upgrade at their gate post (stars show the level, Lv 1 to 5): mended fence
-     (grows 25% faster), sprinkler (45% faster), beehive (30% double crops), golden soil
-     (sells x1.5 and sows itself). Each field has a light split-rail fence (two thin rails, posts only at the corners, mid sides and
-     the gate); new fields start with pale wood and a broken rail that the first upgrade mends.
-   - **The market stall** upgrades from the sell rug when your basket is empty (Lv 1 to 7):
-     fresh crates, price board, produce cart, a helper for Meera, flower boxes, golden sign.
-     Each level raises all prices and later ones sell faster.
-   - **The barn** is the workers' home and where you hire them; the sign counts them. When nothing is
-     ready to pick, workers walk back and doze on the porch beside it, then head out as crops ripen.
-     The barn grows with the crew, each stage making every worker 10% faster:
-     - At 4 workers: a bunk shed with pink curtains, a bench and a water barrel.
-     - At 8 workers: a silo with a dome, a ladder and a red band.
+    npm ci
+    npm test
+    npm run build
+    python3 -m http.server 8768 --bind 127.0.0.1
+    # open http://127.0.0.1:8768/dist/crazygames/index.html
 
-     The barn itself is red plank walls in a white trim frame, with a shingled gambrel roof, a
-     hay-loft door with hay poking out, a hoist beam with a swinging hook and a rooster weathervane
-     that turns with the wind. It sits on its own straw-scattered yard. Its X-braced doors slide
-     apart to show the warm, hay-filled inside when you stand at them, and at night the windows,
-     the loft and the door lanterns light up for the crew.
-   - **Your basket and sandals** improve for free with every farm level: +4 carry each level
-     and faster walking up to level 16, with the basket growing, a red band from level 6 and a
-     gold rim from level 11.
-   Every upgrade spot (each field's gate sign and the barn door) has a painted stand-here marker on
-   the ground: a see-through ring with an up-arrow, green when you can afford it, beige when you
-   can't, and gold while you're standing on it. Locked fields have a For Sale signpost; the moneylender's debt and the home are small mats.
-   Nothing is ever charged just by walking somewhere.
-4. **Idle.** Farmhands walk to the ripest crops, harvest a bagful, and sell it at the market
-   without you. They keep earning while the tab is closed (estimate based on your fields
-   and hands, at 50% efficiency, capped at 8 hours). Crops also keep growing while you're away.
+`npm run build:renderer` only rebuilds the browser bundle. The complete build creates
+`dist/harvest-rush-crazygames.zip`, with the game, renderer and assets at upload-ready
+paths. To play the checked-in source/bundle, simply serve this folder and open
+`index.html`; no Node process is required at runtime.
 
-## Interface
-
-Text uses Nunito, a clean rounded font (the HARVEST RUSH logo keeps Lilita One), in the interface and
-for everything drawn in the world. The interface is flat and farm-coloured (warm wood, parchment and leaf green, soft shadows, no hard
-outlines). The wallet is a large cream-and-gold coin panel at the top left with the idle rate under it, and
-the farm level is a big round badge at the top right with an XP ring, the farm's name and a workers
-and basket line. Upgrades, unlocks, hiring, the debt and the home open a large, clear popup: the item's icon and
-name, its level before and after, a highlighted line saying what you get, and one full-width button
-with the price on it (it says how much more you need when you can't afford it). The corner
-buttons are round leaf buttons with drawn icons.
-
-- **Upgrade card controls:** only a deliberate tap on the green button buys, and it buys on
-  release, not on touch. A finger that slides off the button turns into a walk, and drags that
-  start anywhere else on the card move the farmer, so the card never traps you. A tap that was
-  already landing when the card popped up is ignored (300 ms). The ✕ (or Esc) hides the card until
-  you step off that sign; Space/Enter buy on a keyboard.
-- **Phone layout** (screens up to 520 px wide): a compact HUD so the farm stays visible. The
-  wallet, quest and order cards, level ring, hint, corner buttons (42 px), chapter strip and upgrade
-  card are all scaled down; on a 402×874 iPhone the upgrade card is about 200 px tall instead of
-  300+, and the left-hand cards take about 195 px instead of 245. Desktop sizes are unchanged.
-- **Story strip controls:** the chapter strip never blocks play. Drags that start on it walk the
-  farmer; "Read the chapter" and the ✕ (now a 36 px round button) act only on a tap, on release, and
-  ignore a tap that was already landing when the strip slid in.
-
-## Map
-
-The market sits on a clean paved square across the top of the farm: the stall centred at the back
-with the sell rug in front, the workers' barn on the left and the home lot on the right, mirrored,
-lamps flanking the exit to the road and flowers in the corners. Baba's old tree stands just outside,
-beside the barn. From the square a road sways gently down to the entrance arch, with one field on
-each side of it per row (wheat and carrot nearest the market, grapes and melon by the entrance). Each
-field's inner edge sits about 100 units from the road's centre, so on a 375-pixel phone at least half
-of both neighbouring fields is on screen while you walk past them. Each field has a single gate sign
-on the road's shoulder showing its crop, level stars and ripe count; it is also where you upgrade it.
-The road between fields is kept clear (lamps only light the market square), the duck pond and the
-windmill sit in the outer meadows, and a tree line frames the farm. The road is `ROAD_SEGS` (three gentle curves), rows are
-`FIELD_ROWS` (`[y, side]`), `FIELD_GAP` sets how close fields hug the road, and `roadXAt(y)` gives
-the road's centre at any height so fields, lanes, posts, lamps and pebbles follow it.
-
-The grass carries soft tufts and clover (`TUFTS`, kept off fields, road, lanes, square and pond),
-and the meadows hold farm props: hay bales, wheelbarrows of produce, a log pile and flower patches.
-The square has a faint checker tile with a border band, a stone well in its top-left corner, and
-flower planters top-right and on either side of the walk. Props in `TALL` are depth-sorted with
-the characters. Workers show their basket count only when it is full or they are beside you;
-yours always shows.
-
-## Game feel
-
-The camera has no damping or look-ahead: the farmer moves freely inside a central dead zone (15% of the screen, `DEAD_ZONE`) and the camera follows exactly once they leave it, and kicks in slightly on big moments; buying or
-upgrading sends out shockwave rings (and a short vibration on phones); a newly bought field's plots
-spring up one by one and an upgraded field's plots hop; sold crops send coins arcing up into the
-coin counter, which counts up and bumps.
-
-Floating text comes in three clean styles (`addPop`):
-- **Messages** become cream pills with dark text, matching the flat UI: quest done, lunch, golden
-  crops, upgrade names, "Need X more", "Basket full". A coloured edge and dot mark the kind: gold
-  for rewards, red for warnings, green for upgrades. Pills that appear together stack instead of
-  overlapping. Any pop containing words becomes a pill automatically, and `{pill:false}` opts out.
-- **Coin pops** show a coin icon with a white number. Quick sales merge into one pop that counts up
-  instead of stacking up numbers. Workers don't pop their own sales.
-- **Counters** (`x2!`, combo) stay as bold coloured numbers with a thin outline.
-
-Wording is sentence case rather than shouting capitals.
-
-## Art
-
-A 2.5D cartoon look drawn entirely with the canvas API: a seamless grass texture with crisp
-cel-style patches, tufts, clover and flowers; fields set into a lighter grass lip; worn paths with a lighter centre and pebbles; soil with furrows and grit;
-trees and bushes with shaded undersides and root flares; a soft vignette; and a four-minute
-day-night cycle (dawn, day, golden hour, dusk, night) that tints the scene, changes the sky, and
-makes lanterns, the house window and the barn loft glow while fireflies drift over the fields at
-night (the day starts in the morning). Picked crops throw spinning leaves, sales throw spinning
-coins and sparkles, small flocks of birds cross the farm with shadows on the ground, and petals
-drift on the wind. Tall phone screens zoom in so the farm fills the whole height. Landmarks: a pond with ripples, lily pads, reeds and a duck paddling a slow loop, and a
-windmill with turning sails. All of it lives in the drawing section of `index.html`; `DAY_LEN`
-sets the cycle length.
-
-## The opening
-
-The first minutes are built so a new player always knows exactly one thing to do.
-
-- **No title card:** the game opens straight onto the farm. A new farmer is named Ravi (he/him);
-  name and pronouns can be changed any time in Settings, and the farm label updates as you type.
-  Sound starts on the first tap or key press.
-- **First screen:** just the farmer beside a ripe wheat field outlined in gold, a finger that swipes
-  from the farmer into the wheat (until the first step), and one line: "Drag anywhere to walk". The
-  prologue strip waits until the first few stalks are picked.
-- **Guided tutorial** (the first 5 quests: sell the first basket → sow 8 plots → upgrade the wheat
-  field → collect an egg → buy the carrot field; `TUT_STEPS`):
-  - The quest card, the hint at the bottom (`tutHint`) and one gold bouncing arrow
-    (`tutTarget`, plus the edge arrow when it's off-screen) always agree.
-  - Hints show live progress: "Keep picking: 5/8", "Pick and sell wheat: 12 more to upgrade the
-    field", "Sell more wheat: 18 more for the carrot field".
-  - A full basket always points to Meera's stall.
-  - The quest card reads "Step 2 of 5" with five progress dots and pops when a new step starts;
-    a "Next: …" note floats up after each step, and "FARM IS YOURS!" ends the tutorial.
-  - The hint is a larger gold-edged pill with an icon for each action.
-  - In the world, a gold dashed ring marks the goal (the whole field is outlined when the goal is
-    picking or sowing), and marching dots lead from the farmer to it (`drawTrail`).
-  - On upgrade and buy steps, a tapping finger points at the green button.
-  - The sowing step never goes blank: with no bare soil it points at ripe wheat to clear first.
-  - Green upgrade arrows show only for the current step.
-  - The moneylender and his debt mat wait until the tutorial is done.
-  - For the egg step the arrow points at a hen, and a hen lays within about 4 seconds.
-- **Early rewards:** Meera pays triple for the very first basket. Picking quickly builds a combo,
-  shown as one counter that updates in place (x3, x6 GREAT!, x10 WOW!), and adds up to +60% to that
-  basket's sale.
-- **Timing:** an autopilot that only follows the game's own arrow finishes the tutorial in about
-  30 seconds; a real player takes about two minutes, with no waiting or dead ends.
-- **Later:** chickens arrive with Chapter 1. Dev, the first farmhand, walks in free with Chapter 3.
-  Story strips show for 7 s and never block play.
-
-## Story mode
-
-On a new game you pick a name and pronouns (he, she or they) on the start card; the ⚙️ settings
-changes both later, and the whole story adapts, including verb agreement. Chapters never pause the
-game: each arrives as a short two-line strip above the controls that fades after a few seconds, with
-"Read the chapter" opening the full text (and the partner's name field in Chapter 3).
-
-**First minutes.** The farmer starts beside the wheat field so the first crops are on screen even
-on a phone. A screen-edge pointer always leads to the current goal when it is off screen (ripe crops,
-the market when the basket is filling, the next upgrade you can afford, the moneylender, the barn).
-The screen starts almost empty and fills in as it matters: the quest card appears once you move, the
-farm level card, the moneylender and his mat after the first sale, hiring at the barn once Dev has
-joined, and only the next field is ever for sale.
-
-On a new game you name the hero (default Ravi; Settings renames later), and the prologue
-card tells how the farm was lost. Eight more chapters appear as story cards at milestones,
-each using the chosen name: first sale, carrot field, first farmhand, paying the moneylender's
-300-coin debt (a mat beside the market), pumpkin, strawberry, corn, and the last two fields.
-The farm starts run-down and repairs itself as chapters pass: the wheat fence has missing and
-leaning posts until chapter 2, chickens only arrive with chapter 2, the hero wears patched
-clothes and goes barefoot until the debt is paid, the stall's awning is faded, torn and patched
-until chapter 4 (when Meera chalks the hero's name on the counter board), the scarecrow leans
-with a torn shirt until it is rebuilt taller with its sock crow in chapter 6, and the bunting
-and lanterns only go up for the festival in chapter 7. Chapter 3 also introduces the hero's partner (Priya by default; the card asks for her name, and the
-Settings can change both names later). She appears on the farm after chapter 5 as a wandering
-helper who feeds the chickens, which makes them lay eggs faster, and a "Build a home" mat appears
-by the market (100K). The wedding is chapter 7 and needs both the corn field and the home; from
-then on she also sells beside Meera so your sales go faster, and the house gets a heart on its roof.
-The house itself is a cottage on its own lawn: stone base, timber frame, a porch over a rounded
-door, shuttered windows with flower boxes, a round attic window, and a clothesline with the
-couple's clothes swaying in the wind. The windows glow at night. Once it is built, walking past
-it gives a home-cooked lunch: 30% faster walking for 20 s, recharging every 60 s (`LUNCH_LEN`,
-`LUNCH_CD`). When lunch is ready, a pie steams on the window sill and a 🍲 bubble floats over the
-roof. While it lasts, dust puffs kick up behind you. The full text is in `STORY.md`; the
-in-game cards are the `STORY` array in `index.html`. Older saves skip chapters already lived.
-
-## Characters
-
-The hero is drawn to stand out: a woven conical straw hat with a gradient, a red ribbon band
-with a tail and a wheat sprig, big brown iris eyes with brows, a collared cream shirt with buttons,
-rolled cuffs, a leather belt with a gold buckle and a hip pouch, a knotted red neckerchief with
-flapping tails, rolled olive trousers and strapped sandals, cel shading on hat, shirt and trousers,
-a thicker outline, a larger build, and a soft pulsing spotlight ring under the feet. Farmhands are a mixed crew with their own hair, skin, hats and clothes:
-a kurta-and-dhoti farmer with a draped orange scarf and mustache, a bandana-and-bun worker,
-a kid in a cap and overalls with freckles, a straw-hat vest wearer, a braided bandana worker,
-and a bob-haired farmer in a kurta. Looks are defined in `LOOKS` in `index.html`.
-
-## Living fields
-
-- **Plants grow on screen, drawn by hand.** Each crop grows the way it really does: wheat
-  heads and corn cobs form on tall stalks, carrots stay in the soil with only the leafy top and
-  an emerging orange shoulder showing, tomatoes redden on a bush, strawberries hang low, grape
-  bunches turn from green to purple under the leaves, and pumpkins and melons swell on the
-  ground beside their vines. Foliage grows with the timer, the fruit appears at 50% and
-  colours up by ripeness, then bobs with a glow and sparkles when ready. A wind wave rolls
-  across every field. (Emoji are only used for picked produce: basket, pads, signs, market.)
-- **Every crop is drawn by hand through its whole life:** young leaves, then flowers, then green
-  fruit that colours up, then ripe (bobbing, glossy, sparkling).
-  - **Wheat:** seven stalks with braided, whiskered ears that turn gold and nod; golden light
-    waves roll across a ripe field.
-  - **Carrot:** feathery fronds over an orange shoulder that pushes up out of the soil.
-  - **Tomato:** a leafy bush on a cane stake, yellow flowers, then green → orange → red fruit.
-  - **Pumpkin / Melon:** a ground vine with lobed leaves, a curly tendril and a yellow flower;
-    ribbed pumpkins, striped melons.
-  - **Strawberry:** low trifoliate leaves on straw mulch, white flowers, seeded berries.
-  - **Corn:** a tall stalk with broad arching leaves, a tassel, and two husked cobs with silk.
-  - **Grapes:** a vine twisting up a post and crossbar, five-lobed leaves, hanging bunches.
-- **Each crop comes off differently:**
-  - Wheat and corn get a sickle swish and chaff.
-  - Carrots pop out with dirt clods.
-  - Tomatoes, strawberries and grapes pluck with a juicy splash.
-  - Pumpkins and melons thunk down with a dust puff.
-
-  Each has its own sound. Leftovers stay on the plot until it is sown again: stubble for wheat,
-  stubs for corn, a dug hole for carrots, a dried vine for pumpkins and melons.
-- **Golden crops:** now and then a crop ripens golden (glowing, extra sparkles) and pays 10× its
-  price on top. The first one is likely soon after your sixth harvest; after that the chance is
-  3% per ripening.
-- **Critters:**
-  - Sparrows drop in to peck at ripe wheat and corn, and scatter with a chirp when you walk up.
-  - A rabbit sneaks into the carrot patch to nibble, and bolts when you come close.
-- **Chickens** (two per field) wander, peck, flee with a squawk when you get close, and lay
-  eggs. Walk over an egg to collect it: it pays three times the price of your best crop.
-- **Bees** hover over ripe crops, **scarecrows** with a crow guard each field, and the field
-  sign shows a growth bar and a bouncing badge with the number of ripe crops.
-- **Sprinklers** appear once you buy Water and spray the field in cycles.
-
-## Content
-
-| Field      | Crop | Price | Grow time | Unlock cost | Perfect-play arrival |
-|------------|------|-------|-----------|-------------|----------------------|
-| Wheat      | 🌾   | 1     | 4 s       | free        | start                |
-| Carrot     | 🥕   | 3     | 7 s       | 40          | 0.2 min              |
-| Tomato     | 🍅   | 8     | 11 s      | 500         | 1.6 min              |
-| Pumpkin    | 🎃   | 20    | 16 s      | 6K          | 8 min                |
-| Strawberry | 🍓   | 45    | 22 s      | 45K         | 17 min               |
-| Corn       | 🌽   | 100   | 30 s      | 350K        | 28 min               |
-| Grapes     | 🍇   | 220   | 40 s      | 2M          | 57 min               |
-| Melon      | 🍉   | 500   | 55 s      | 10M         | 106 min              |
-
-Upgrade tables live at the top of the script: `FIELD_UP`, `FIELD_GROW` and `FIELD_UP_MUL` for
-fields, `STALL_UP` and `STALL_SELL` for the stall, `HIRE_BASE`/`HIRE_MUL`/`HIRE_MAX` for workers.
-Older saves carry over: Water and Seeder levels become field levels, Prices becomes the stall
-level, and Bag and Speed now follow farm level.
-Costs scale geometrically per level. Farm level is an XP bar driven by total coins earned.
-
-### Balance
-
-The economy was tuned with a headless simulator, `tools/sim.js`, which runs the real game code with
-a bot that picks, sells and buys the cheapest thing it can afford. "Perfect-play arrival" above is
-that bot; a real player is roughly 1.5–2× slower, plus offline earnings between sessions.
-
-- **Curve:** each new field takes about twice as long as the one before. The whole farm is maxed
-  at about 2 hours of perfect play, and the first festival is affordable at about 2¼ hours.
-- **Field upgrades** cost the larger of `(price×30+5) × FIELD_UP_MUL` (1, 5, 20, 70) and a share of
-  the field's land price (`FIELD_UP_LAND`: 5%, 15%, 35%, 75%), so late fields always have
-  something worth saving for.
-- **Stall:** 60, 500, 6K, 80K, 900K, 6M for ×1.3 → ×5.5 prices.
-- **Workers:** 100 × 2.6ⁿ (12 max). Each carries 4 crops, +1 every two farm levels, up to 12.
-  The farmer earns 60–80% of income; the crew is a steady supplement and the offline engine.
-- **Home** 100K, **debt** 300, **first festival** 15M (×5 each season).
-- **Late quest rewards** scale with their goals (home 15K, corn 50K, every field 1.5M).
-
-To re-run: open `http://127.0.0.1:8767/?debug`, then in the console load `tools/sim.js` and run
-`await SIM.run(3600*3)`; read `SIM.log` (purchases with minute and level) and `SIM.curve`
-(coins per minute and the farmer's share). It only runs on the 127.0.0.1 test origin and never saves.
-
-## Reasons to come back
-
-- **Welcome-back card.** After 2 minutes or more away (closing the game or switching tabs),
-  returning players get a card: "Welcome back, Ravi! You were away 3h 12m", with what the farm
-  earned and how many workers kept picking. The coins wait for the **Collect** button and then
-  fly into the wallet. Uncollected earnings are saved (`pendingAway`), so they are never lost.
-- **Daily gift.** Once a day a wrapped basket from Meera appears in the market square, between
-  the barn and the sell rug, with a "Day N" tag; walk over it to open it. The edge arrow points
-  to it when it is off-screen.
-  - Value: about 90 s of idle income (with a floor for early farms) times the streak multiplier
-    (`GIFT_MULT`: 1, 1.5, 2, 2.5, 3, 4, then 6× on day 7).
-  - Streak: claiming every day raises it; missing a day resets it to day 1; after day 7 it
-    starts again.
-  - Hidden during the first-minutes tutorial (until quest 3).
-- **Meera's orders.** After your 10th sale, Meera calls out timed orders ("The school kitchen
-  ran out. 30 carrots, please!").
-  - A card under the quest shows the crop, progress, a bar, the timer (pulsing red under 20 s)
-    and the reward.
-  - Only your own sales of that crop count.
-  - Finishing pays the larger of 2.5× the crops' value or 40% of what the farm earns idle over
-    the order's time, so orders are worth chasing early and late.
-  - A missed order just expires with a kind word. The next one comes 40–80 s later.
-
-## The Harvest Festival (new seasons)
-
-Once the story is complete (all 9 chapters) and all 8 fields are open, a 🎪 festival mat appears
-in the square, right of the sell rug, and Meera suggests it.
-
-- **Cost:** 15M for the first festival, then 5× more each time (`FESTIVAL_BASE`, `FESTIVAL_MUL`).
-- **Holding it:** a banner and about 3 seconds of fireworks, then a new season starts.
-  - **Starts over:** coins (to 100), fields (only wheat open, all at level 1), the crew and the stall.
-  - **Stays:** the story, the home, family, level, basket and sandals, and lifetime stats.
-- **Reward:** a permanent ribbon. Every ribbon adds +50% to all crop prices (`seasonMult`).
-- **Keepsake:** each ribbon hangs as a prize rosette on the farm gate (up to 6 shown), and the
-  farm sign reads "Ravi's Farm 🎀2".
-- **Story beat:** a "Season N · A new spring" strip opens the new season.
-
-## Sound
-
-All sound is synthesised with WebAudio; there are no audio files.
-- **Mix:** effects, music and ambience have their own volume channels under a master mute. They
-  share one soft room reverb, and a compressor keeps pile-ups from clipping. World sounds (chickens,
-  ducks, fireworks) are panned left or right to where they happen.
-- **Instruments:** `voice()` (a filtered oscillator with sweeps), `noise()` (filtered noise for
-  rustles, whooshes, thuds and steps), `mallet()` (kalimba/marimba-like) and `pluck()`. Busy
-  effects are throttled so fast play never stacks a wall of sound.
-- **Effects:**
-  - Picking makes a bubbly pop that climbs a pentatonic scale with the combo.
-  - Coins play a two-note ding.
-  - Buying, upgrading and levelling up play marimba arpeggios.
-  - Golden crops play a shimmering run.
-  - Wheat and corn get a sickle whoosh, carrots pop out of the soil, and pumpkins and melons land
-    with a weighty thud.
-  - Menu buttons click softly.
-- **Footsteps** change with the ground: soft on grass, crunchy on the road, a tap on the paved
-  square, muffled on soil.
-- **Life:**
-  - Chickens cluck when they scatter.
-  - Ducks quack when you're near the pond.
-  - A rooster crows at dawn.
-  - Sparrows chirp.
-  - Festival fireworks boom and crackle.
-- **Music:** a C–Am–F–G loop with filtered pads, a soft bass, and a kalimba tune with an A and a B
-  section (16 bars before it repeats). By day a soft shaker and kick join in. At night it slows,
-  the beat drops out and only a few kalimba notes remain.
-- **Ambience:** birdsong by day (trills, whistles, chirps) and crickets at night.
-
-## Settings
-
-The ⚙️ button (bottom right, next to the quick mute) opens Settings, which pauses the game:
-- volume sliders for music, sound effects and birds & crickets,
-- a vibration toggle,
-- your name and pronouns, and her name once she has been met (the farm label updates as you
-  type; closing Settings with a new name greets you by it),
-- Reset farm (with a confirmation).
-
-Everything is saved in `S.settings`.
-
-## Performance
-
-Rendering is tuned for phones (frame time went from 8.7 ms to 2.3 ms on a desktop with all 8
-fields on screen).
-- **Crop sprites:** each crop is painted once per growth stage (16 steps, plus ripe and golden)
-  into a small sprite (`PLANT_CACHE`). Each frame just stamps it with live sway, ripe bounce, the
-  wheat shimmer and the golden glow.
-- **Field images:** each field's soil, rows, mounds and fence are painted once into one image
-  (`FIELD_CACHE`). It is redrawn live only while a new field springs in.
-- **Culling:** fields and decor off-screen are skipped (`inView`).
-- **Pixel density:** capped at 2×. Caches rebuild automatically at the new scale when the zoom
-  or pixel density changes.
+Three.js is the only gameplay renderer. Graphics always uses Auto; saved manual
+quality and compatibility preferences migrate automatically without changing progress,
+audio or vibration preferences. Settings contains no renderer or quality selectors.
+Canvas 2D is used to author individual textures, never to render a gameplay frame.
+Startup or graphics-context failure displays a compact reload card. Serve the game
+from a local server for testing and upload the packaged ZIP to CrazyGames.
 
 When changing crop art, edit the draw functions as usual; the sprites are made from them.
 
 **Full farm on weak phones.** With everything unlocked (8 fields at Lv 5, 12 workers, partner,
 home, festival) the game adapts to the device:
-- **Graphics quality** (`QUAL`, Settings ▸ Graphics: Auto / High / Battery saver). Auto starts one
+- **Graphics quality** (`QUAL`, always Auto). Auto starts one
   step lighter on devices with 4 or fewer CPU cores or 3 GB or less memory, steps down after about
   2.5 s under ~40 fps, and tries one step richer after 40 s of headroom.
 
@@ -437,7 +109,7 @@ home, festival) the game adapts to the device:
   - **Auto keeps a lower level only if it helps** (`QUAL.probe`): under ~42 fps for 3 s it tries one
     step lighter for 3.5 s; if fps didn't improve by 15% (the host is the limit) it goes back to full
     quality and doesn't try again for 2 minutes. Otherwise it keeps the lighter level, and tries one
-    step richer after 30 s above ~55 fps. Settings ▸ Graphics: Auto / High / Medium / Battery saver.
+    step richer after 30 s above ~55 fps. Graphics always uses Auto.
   - **Full-screen effects off the canvas:** the vignette is a CSS layer (`#vig`) drawn by the compositor,
     and the sky is only painted where the view goes past the island, so the canvas no longer fills
     every pixel two extra times per frame.
@@ -447,13 +119,44 @@ home, festival) the game adapts to the device:
   - **Hidden readout:** tap the level ring 5 times for fps, screen Hz, frame times, logic/draw ms,
     view and canvas size, quality, embedding and device info. Works inside the CrazyGames app.
 - **Auto quality only as a last resort:** it steps down only for sustained trouble (average over 28 ms
-  for 4 s, or very frequent hitches); Settings ▸ Graphics ▸ High turns it off entirely.
+  for several seconds). There is no manual quality override.
 - **60 fps pacing on phones** (`PACE`): 90/120 Hz screens no longer double the work; frames are paced
   to an average of 60 on any refresh rate.
 - **No per-frame garbage in the draw list:** decoration lists are split once, the y-sorted layer reuses
   one array, and only on-screen trees and props are sorted (about 28 of 162 at a time).
 - **No WebView scrolling:** touchmove is blocked outside the settings and chapter cards, and
   `overscroll-behavior: none` stops bounce and pull-to-refresh fighting the drag joystick.
+
+**Fewer paths, same pixels** (full quality on every device). A maxed farm went from ~2,500 vector
+paths a frame to ~1,100–1,450; drawing on a CPU-only canvas (as in app WebViews) got 15–25% faster.
+- **Exact stamps** (`stamp()`): still art is painted once into an image at the exact screen scale *and*
+  the same sub-pixel offset it would be drawn at, then copied 1:1 onto whole device pixels, so it
+  matches live drawing (checked pixel by pixel with `tools/drawcheck.js`). Stamped: trees (trunk; the
+  canopy sways as a stamp at 1/4 px steps), bushes, rocks, props, flower heads, the stall, barn and
+  home (in pieces, in their original draw order: the shopkeeper, hay, hook, weathervane, clothes,
+  steam and smoke stay live between them), windmill tower, pond and lily pads, gate arch, lamps, the
+  rug and signs, pad boards and prices, hives, scarecrow heads and picked-plot stubble. Glows are
+  still added live. A stamp's key names everything it depends on (level, name, night, crew…).
+  Off-screen stamps are skipped; while the view zooms (a kick) or a piece scales in an animation, it
+  is drawn live. Images are kept within a pixel budget set by device memory (LRU).
+- **Particle dots** (water, dust, bursts) are copied from a small image per colour and size (to 1/4
+  unit) holding 16 sub-pixel offsets. Leaves, coins, rings and confetti stay live.
+- **Chickens** use cached sprites like the workers: 24 poses per hop or peck cycle.
+- **Workers: body and basket cached apart.** Picking a crop only repaints the small basket sprite
+  (painted once in the standing pose; each walk frame's bounce and squash are applied when placed),
+  and the body sprite is trimmed to the figure. Before, every pick redrew whole worker sprites and a
+  160-entry first-in-first-out cache was too small for 12 workers: ~120 sprite rebuilds a second on a
+  maxed farm, now ~1 (plus one small basket per pick).
+- **Zoom kick fix:** the camera's zoom kick decayed toward 0 without reaching it, so for ~8 s after
+  every purchase or level-up the scale differed by a hair each frame and every cached ground tile was
+  rebuilt every frame (~2,000 tile repaints per kick). It now snaps to 0.
+- **The player is still drawn live** (the hero is always on screen and closest to the eye).
+
+**Three.js world renderer:** all visible world layers, including night lighting and
+effects, use `src/three-renderer.mjs` and `src/farm-three-scene.mjs`. The legacy raw
+WebGL renderer and Canvas gameplay fallback have been removed. The hidden device
+test measures rendering costs without switching renderers.
+
 
 ## CrazyGames
 
@@ -500,7 +203,7 @@ Ready for a CrazyGames **Basic Launch** (SDK v3, no ads).
     fountain and a glossy gradient title. `tools/shoot.mjs` is its DevTools screenshot helper.
   - `store/GPT_PROMPTS.md` has ready-to-paste ChatGPT prompts (style sheet, title lettering, one per
     cover size, a video shot list) for painted alternatives.
-- **Local test:** `http://127.0.0.1:8767/` runs the SDK in local mode (console logs every event);
+- **Local test:** `http://127.0.0.1:8768/` runs the SDK in local mode (console logs every event);
   add `&muteAudio=true` to test muting.
 
 ## Debug
@@ -513,5 +216,149 @@ Open with `?debug` to get a `window.FARM` hook:
 
 Numbers live at the top of the script in `index.html`: `CFG` (speeds, capacities, pad drain time,
 offline cap), `CROPS`, `FIELD_COST`, `UPG` (base cost, multiplier, max level), `COL` and `PAD_TINT` for colors, `PALS` for the farmer outfit
-palettes, and `BK` / `BASKET_ROW_H` for where the back-basket sits and how crops stack in it.
+palettes, and `BK` / `BASKET_SLOTS` for the back-basket and its shallow produce arrangement.
 The 3×3 layout of the farm is `FIELD_SLOTS` with the market in the middle cell.
+
+## CrazyGames Basic Launch candidate — 2026-11-07
+
+The upload is `dist/harvest-rush-crazygames.zip` (4.72 MiB compressed,
+5.41 MiB total assets, 14 files). The SDK is the only external runtime resource;
+Nunito and Lilita One are bundled locally with their SIL Open Font Licenses.
+No advertisements, in-app purchases, external login, cross-promotion, custom
+fullscreen button or third-party analytics are implemented.
+
+The first rendered farm enables saving and SDK lifecycle reporting. Closing the
+page before startup completes cannot overwrite an existing save. Hidden or paused
+startup never generates a false gameplayStart event. Art/cover/trailer preview
+sessions are read-only from startup. iOS audio resumes on a direct pointer, key
+or touch-release gesture. Settings includes a 44 px close button and labeled audio
+controls; short screens retain a scrollable settings panel.
+
+Run `npm test` then `npm run build`. The build also runs `tools/check-launch.mjs`
+and fails if the package exceeds the stricter 20 MiB mobile initial-size target,
+1500 files, loses local fonts/licenses, adds absolute HTML bundle paths, introduces
+ads/custom fullscreen calls, or fails the SDK lifecycle regression tests.
+
+`tools/iframe-check.html` provides isolated HUD/order, upgrade and tutorial scenarios.
+DPR 1 layout checks covered all published sizes: 907×510, 1216×684, 1077×606,
+821×462, 1366×768, 1920×1080, 1536×864, 1280×720, 800×450 and 1080×607,
+plus 390×844 portrait. Cards fit without horizontal overflow; purchase/close
+controls are at least 44 px tall. These are layout checks, not physical-device
+performance certification. Simulation, input, save migration, camera, rendering,
+navigation and reminder regression suites also pass.
+
+Submission extras are outside the game ZIP: three PNG covers in `dist/covers/v2/`
+(1920×1080, 800×1200 and 800×800), `dist/submission-metadata.json`, and the
+release-specific `dist/basic-launch-report.json`. The v2 covers use dedicated generated illustrations referencing Ravi and the
+painted farm art. Each format is separately composed with the title as its only text;
+the earlier screenshot-based covers remain in `dist/covers/` for comparison.
+The report identifies its ZIP by SHA-256; regenerate the report when changing the
+release ZIP.
+
+Outstanding before submission: test the uploaded ZIP in the CrazyGames Developer
+Portal Preview/QA tool; check actual Chrome/Edge, Safari/iOS, Android/CrazyGames
+App and a 4 GB Chromebook; confirm title/asset rights and submission metadata. The two required gameplay
+preview videos have been recorded and locally validated (see below).
+No portal upload or publication has been performed. Local checks cannot guarantee
+CrazyGames acceptance or performance on hardware that has not been tested.
+
+Official requirements: https://docs.crazygames.com/requirements/intro/,
+https://docs.crazygames.com/requirements/technical/,
+https://docs.crazygames.com/requirements/gameplay/,
+https://docs.crazygames.com/requirements/game-covers/.
+
+## Promotional gameplay preview videos
+
+The current versions are `dist/video/harvest-rush-promo-landscape-1920x1080.mp4`
+and `dist/video/harvest-rush-promo-portrait-1080x1620.mp4`. Both are 18.0 seconds
+at 30 fps, H.264/yuv420p MP4 with fast-start metadata and no audio track.
+Landscape is 16.96 MiB; portrait is 17.56 MiB.
+
+Six quick shots show wheat, tomatoes, a market sale, pumpkins, strawberries and
+corn alongside carrots, purple grapes, giant watermelons, the duck pond and the
+spinning windmill. Hard cuts remove travel and waiting; action within each shot
+remains at normal gameplay speed with native Three.js camera zoom.
+The guidance dots, destination arrow, instructional text and purchase panels are
+omitted while wooden signboards (`MARKET`, `WORKERS 8`, `RAVI'S FARM`) and the
+compact coin wallet remain. Each opening uses its matching v2 cover
+for approximately 0.3 seconds. Earlier continuous takes remain as older files.
+
+Open `/dist/video/index.html` on the local server to play/download the current
+promotional versions. Technical validation is in `dist/video/validation.json`.
+Run `HARVEST_FFPROBE=/path/to/ffprobe node tools/check-preview-videos.mjs` to check
+dimensions, duration, 30 fps, H.264, the 50 MiB limit and absence of audio.
+Both videos were fully decoded without errors and visually sampled for QA.
+
+`tools/record-promo.mjs` and `tools/preview-recorder.html` are local authoring tools
+excluded from the game ZIP. They stage six separate takes in an isolated no-save farm
+and drive ordinary game movement at native Three.js zoom with the real coin HUD.
+The HUD capture library and MIT license are in `tools/recording-vendor/`.
+FFmpeg/FFprobe are authoring dependencies.
+
+## Final progression smoke test — 2026-11-07
+
+`npm test` now includes `tools/smoke-progression.mjs`: 22 deterministic checks run
+the full game simulation in a Node VM with presentation/audio stubbed. The early
+harvest/sale/upgrade/egg/carrot flow uses earned coins. Controlled late-game states
+cover all 15 goals, nine chapters, eight fields, upgrade/crew caps, autonomous
+workers, save reload/migration, offline collection, festival reset, 30/60/120/144/165 Hz
+movement and paused/hidden-frame behavior. `dist/progression-smoke-report.json`
+records results and the tested ZIP hash.
+
+The browser smoke used a separate origin at `127.0.0.1:8775`, preserving the user's
+existing save. Fresh onboarding, the first sale and upgrade, reload, settings
+pause/resume, egg collection and carrot unlock were exercised through the UI.
+The debt pad was visually checked beside the moneylender at the supplied reference
+viewport. No physical-device or live CrazyGames portal certification is implied.
+
+Fixed during this pass: duplicate charges from stale rapid purchase input,
+max-level field/market offer crashes, malformed saved-array startup crashes,
+fractional coin shortfall rounding, and payment-pad alignment. Valid existing saves
+and older growth-upgrade migrations remain supported. Explicitly reopening a
+dismissed upgrade card still works. The release ZIP was rebuilt and checked.
+
+## Lossless build-size optimization
+
+The release ZIP decreased from 6,615,136 to 4,945,896 bytes: 1,669,240 bytes
+saved (25.2%; 6.31 → 4.72 MiB). Unpacked assets decreased from 7.61 to 5.41 MiB.
+`dist/asset-optimization-report.json` records the before/after ZIP sizes, component
+measurements, validations and SHA-256. The previous ZIP is retained at
+`dist/harvest-rush-before-lossless.zip`.
+
+Production uses four exact-lossless WebP atlases and five complete WOFF2 fonts.
+Dimensions, RGBA values (including hidden RGB), sprite bounds, glyph coverage,
+metrics, outlines, instructions and shaping tables are preserved. PNG and TTF
+masters remain in source; the package contains only their smaller production
+versions and unchanged licenses.
+
+`createImageBitmap` decodes with `premultiplyAlpha: 'none'`: default WebP browser
+decoding rounds some translucent edges differently from PNG. Popup crop icons
+paint directly into canvas to avoid another alpha round trip. Browser comparison
+found zero image-channel differences for all four atlases and eight popup crops,
+and identical text samples for all five fonts at 14/24/32 px. The actual packaged
+farm loaded all four painted atlases, showed the correct crop icon and retained
+saved progression. Original image decoding remains as a recovery path for engines
+without native bitmap decoding.
+
+Authoring dependencies: `pip install -r tools/requirements-assets.txt`.
+Run `python tools/optimize-assets.py --write` to regenerate assets, or omit `--write`
+to reverify them. `assets/optimized-assets.json` pins the proof to exact source and
+production hashes. `npm test` and the build check those hashes; the build also
+checks that original PNG/TTF duplicates are absent. `tools/check-assets.html`
+provides the browser pixel/text comparison, and
+`python3 tools/check-atlas-metadata.py` verifies the original alpha bounds.
+
+## Situational navigation after the tutorial
+
+The dots and destination arrow stay available during the three tutorial lessons.
+After completion, ordinary play has no route. Existing full-bag and idle reminders
+can enable a route for up to six seconds: a newly full basket points toward the
+market, while 18 seconds of inactivity can briefly point to a useful goal. Idle
+input clears the route immediately; full-bag help expires even if the bag remains
+full. Existing 25-second full-bag and 50-second idle cooldowns prevent repeated
+nudges. Offers, pauses and hidden tabs suppress guidance. Optional objectives
+remain visible without continuously steering the player.
+
+`navigationTarget()` gates the renderer while `goalTarget()` retains objective
+selection for contextual messages. `tools/check-context.mjs` verifies normal play,
+tutorial guidance, triggering, expiry, input dismissal, cooldowns and suppression.

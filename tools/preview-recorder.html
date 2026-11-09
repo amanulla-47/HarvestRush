@@ -1,0 +1,5 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><title>Harvest Rush gameplay recorder</title>
+<style>body{margin:0;background:#213b2a;color:#fff;font:15px system-ui}header{padding:12px;display:flex;gap:12px;align-items:center;flex-wrap:wrap}button,select{font:inherit;padding:8px}#stage{position:relative;overflow:hidden}iframe{border:0;display:block}#output{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}#result{max-width:100%;display:none}</style>
+<header><label>Format <select id="format"><option value="landscape">Landscape 1920×1080</option><option value="portrait">Portrait 1080×1620</option></select></label><button id="prepare">Prepare isolated farm</button><button id="record" disabled>Record 18-second promo</button><span id="status" role="status">Choose a format, then prepare.</span><a id="download" hidden>Download recording</a></header>
+<div id="stage"><iframe id="game" title="Isolated farm"></iframe><canvas id="output"></canvas></div><video id="result" controls muted></video>
+<script src="recording-vendor/html-to-image.js"></script><script src="preview-recorder.js"></script></html>

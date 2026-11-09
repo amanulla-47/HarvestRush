@@ -1,0 +1,13 @@
+<!doctype html>
+<html lang="en"><meta charset="utf-8"><title>Harvest Rush launch QA</title>
+<style>html,body{margin:0;background:#26382d;color:#fff;font:14px system-ui}header{height:42px;display:flex;align-items:center;gap:16px;padding:0 12px}select{font:inherit}iframe{display:block;border:0;background:#93b976}</style>
+<header><label>Frame size <select id="size"></select></label><label>Scenario <select id="scenario"><option value="hud">HUD and order</option><option value="purchase">Upgrade card</option><option value="tutorial">Tutorial</option></select></label><span>Isolated preview · progress is never saved</span></header>
+<iframe id="game" title="Harvest Rush"></iframe>
+<script>
+const sizes=[[907,510],[1216,684],[1077,606],[821,462],[1366,768],[1920,1080],[1536,864],[1280,720],[800,450],[1080,607],[390,844]];
+const size=document.querySelector('#size'),scenario=document.querySelector('#scenario'),game=document.querySelector('#game');
+for(const [w,h]of sizes)size.add(new Option(w+' × '+h,w+'x'+h));
+function resize(){const [w,h]=size.value.split('x');game.style.width=w+'px';game.style.height=h+'px';}
+function load(){game.src='../dist/crazygames/index.html?debug&art&ui='+scenario.value;}
+size.onchange=resize;scenario.onchange=load;resize();load();
+</script></html>
